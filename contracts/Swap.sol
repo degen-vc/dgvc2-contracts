@@ -21,7 +21,7 @@ contract Swap is Context, Ownable {
 
 
     function swap() external returns (bool) {
-        uint balance = dgvcTwo.balanceOf(address(this));
+        uint balance = dgvcOne.balanceOf(_msgSender());
         require(balance > 0, 'Nothing to swap');
         require(dgvcTwo.balanceOf(address(this)) >= balance, 'Not enough DGVC2 on swap contract');
 
