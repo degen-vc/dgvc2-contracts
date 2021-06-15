@@ -12,7 +12,7 @@ contract Swap is Context, Ownable {
 
     IERC20 public dgvcOne;
     IERC20 public dgvcTwo;
-    address public constant deadAddress = 0x000000000000000000000000000000000000dEaD;
+    address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
     constructor(IERC20 _dgvcOne, IERC20 _dgvcTwo) public {
         dgvcOne = _dgvcOne;
@@ -25,7 +25,7 @@ contract Swap is Context, Ownable {
         require(balance > 0, 'Nothing to swap');
         require(dgvcTwo.balanceOf(address(this)) >= balance, 'Not enough DGVC2 on swap contract');
 
-        dgvcOne.safeTransferFrom(_msgSender(), deadAddress, balance);
+        dgvcOne.safeTransferFrom(_msgSender(), DEAD_ADDRESS, balance);
 
         dgvcTwo.safeTransfer(_msgSender(), balance);
         return true;

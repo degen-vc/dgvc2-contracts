@@ -19,11 +19,11 @@ contract DegenVC1 is Context, IERC20 {
     }
 
     function name() public pure returns (string memory) {
-        return "DegenVC";
+        return 'DegenVC';
     }
 
     function symbol() public pure returns (string memory) {
-        return "DGVC1";
+        return 'DGVC1';
     }
 
     function decimals() public pure returns (uint8) {
@@ -79,7 +79,7 @@ contract DegenVC1 is Context, IERC20 {
             _msgSender(),
             _allowances[sender][_msgSender()].sub(
                 amount,
-                "ERC20: transfer amount exceeds allowance"
+                'ERC20: transfer amount exceeds allowance'
             )
         );
         return true;
@@ -108,7 +108,7 @@ contract DegenVC1 is Context, IERC20 {
             spender,
             _allowances[_msgSender()][spender].sub(
                 subtractedValue,
-                "ERC20: decreased allowance below zero"
+                'ERC20: decreased allowance below zero'
             )
         );
         return true;
@@ -119,12 +119,12 @@ contract DegenVC1 is Context, IERC20 {
         address recipient,
         uint256 amount
     ) internal virtual {
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
+        require(sender != address(0), 'ERC20: transfer from the zero address');
+        require(recipient != address(0), 'ERC20: transfer to the zero address');
 
         _balances[sender] = _balances[sender].sub(
             amount,
-            "ERC20: transfer amount exceeds balance"
+            'ERC20: transfer amount exceeds balance'
         );
         _balances[recipient] = _balances[recipient].add(amount);
         emit Transfer(sender, recipient, amount);
@@ -135,8 +135,8 @@ contract DegenVC1 is Context, IERC20 {
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), 'ERC20: approve from the zero address');
+        require(spender != address(0), 'ERC20: approve to the zero address');
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
