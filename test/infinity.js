@@ -3,7 +3,7 @@ const assert = require('assert');
 const { BigNumber, utils } = require('ethers');
 const { expect } = require('chai');
 
-  describe('InfinityProtocol', function() {
+  describe('DGVC', function() {
     const bn = (input) => BigNumber.from(input);
     const assertBNequal = (bnOne, bnTwo) => assert.strictEqual(bnOne.toString(), bnTwo.toString());
 
@@ -28,8 +28,8 @@ const { expect } = require('chai');
       userTwo = accounts[3];
       afterEach('revert', function() { return ganache.revert(); });
 
-      const InfinityProtocol = await ethers.getContractFactory('InfinityProtocol');
-      infinity = await InfinityProtocol.deploy(router);
+      const DGVC = await ethers.getContractFactory('DGVC');
+      infinity = await DGVC.deploy(router);
       await infinity.deployed();
 
       await ganache.snapshot();

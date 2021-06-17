@@ -2,11 +2,11 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/IInfinityProtocol.sol";
+import "./interfaces/IDGVC.sol";
 
-contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
-    mapping (address => uint) private _rOwned;
-    mapping (address => uint) private _tOwned;
+contract DGVC is IDGVC, Context, Ownable {
+    mapping (address => uint) private _reflectionOwned;
+    mapping (address => uint) private _actualOwned;
     mapping (address => mapping (address => uint)) private _allowances;
 
     mapping (address => bool) private _isExcluded;
@@ -40,7 +40,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
 
     constructor (address _router) public {
-        _rOwned[_msgSender()] = _rTotal;
+        _reflectionOwned[_msgSender()] = _rTotal;
         router = _router;
         setMaxCycles(500);
         emit Transfer(address(0), _msgSender(), _tTotal);
@@ -63,8 +63,8 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     }
 
     function balanceOf(address account) public view override returns (uint) {
-        if (_isExcluded[account]) return _tOwned[account];
-        return tokenFromReflection(_rOwned[account]);
+        if (_isExcluded[account]) return _actualOwned[account];
+        return tokenFromReflection(_reflectionOwned[account]);
     }
 
     function transfer(address recipient, uint amount) public override returns (bool) {
@@ -130,8 +130,8 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         require(!_isExcluded[account], "Account is already excluded");
         require(account != router, 'Not allowed to exclude router');
         require(account != feeReceiver, "Can not exclude fee receiver");
-        if (_rOwned[account] > 0) {
-            _tOwned[account] = tokenFromReflection(_rOwned[account]);
+        if (_reflectionOwned[account] > 0) {
+            _actualOwned[account] = tokenFromReflection(_reflectionOwned[account]);
         }
         _isExcluded[account] = true;
         _excluded.push(account);
@@ -142,7 +142,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         for (uint i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
                 _excluded[i] = _excluded[_excluded.length - 1];
-                _tOwned[account] = 0;
+                _actualOwned[account] = 0;
                 _isExcluded[account] = false;
                 _excluded.pop();
                 break;
@@ -227,10 +227,10 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
         uint rBurn =  transferBurn * currentRate;
-        _rOwned[sender] = _rOwned[sender] - rAmount;
-        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -244,11 +244,11 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
         uint rBurn =  transferBurn * currentRate;
-        _rOwned[sender] = _rOwned[sender] - rAmount;
-        _tOwned[recipient] = _tOwned[recipient] + tTransferAmount;
-        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
+        _actualOwned[recipient] = _actualOwned[recipient] + tTransferAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -262,11 +262,11 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
         uint rBurn =  transferBurn * currentRate;
-        _tOwned[sender] = _tOwned[sender] - transferAmount;
-        _rOwned[sender] = _rOwned[sender] - rAmount;
-        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
+        _actualOwned[sender] = _actualOwned[sender] - transferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -280,12 +280,12 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
         uint rBurn =  transferBurn * currentRate;
-        _tOwned[sender] = _tOwned[sender] - transferAmount;
-        _rOwned[sender] = _rOwned[sender] - rAmount;
-        _tOwned[recipient] = _tOwned[recipient] + tTransferAmount;
-        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
+        _actualOwned[sender] = _actualOwned[sender] - transferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
+        _actualOwned[recipient] = _actualOwned[recipient] + tTransferAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -323,7 +323,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
 
         uint rBurn =  amount * _getRate();
         _rTotal = _rTotal - rBurn;
-        _rOwned[sender] = _rOwned[sender] - rBurn;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - rBurn;
 
         _tBurnTotal = _tBurnTotal + amount;
         _tTotal = _tTotal - amount;
@@ -363,9 +363,9 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint rSupply = _rTotal;
         uint tSupply = _tTotal;
         for (uint i = 0; i < _excluded.length; i++) {
-            if (_rOwned[_excluded[i]] > rSupply || _tOwned[_excluded[i]] > tSupply) return (_rTotal, _tTotal);
-            rSupply = rSupply - _rOwned[_excluded[i]];
-            tSupply = tSupply - _tOwned[_excluded[i]];
+            if (_reflectionOwned[_excluded[i]] > rSupply || _actualOwned[_excluded[i]] > tSupply) return (_rTotal, _tTotal);
+            rSupply = rSupply - _reflectionOwned[_excluded[i]];
+            tSupply = tSupply - _actualOwned[_excluded[i]];
         }
         if (rSupply < _rTotal / _tTotal) return (_rTotal, _tTotal);
         return (rSupply, tSupply);
