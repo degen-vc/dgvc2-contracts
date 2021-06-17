@@ -1,5 +1,6 @@
 const Ganache = require('./helpers/ganache');
 const { expect } = require('chai');
+const { utils } = require('ethers');
 
 describe('Swap', function() {
   const TRANSFER_AMOUNT = utils.parseUnits('10000').toBigInt();
@@ -22,7 +23,6 @@ describe('Swap', function() {
     afterEach('revert', function() { return ganache.revert(); });
 
     const DGVC = await ethers.getContractFactory('DegenVC1');
-    
     dgvc = await DGVC.deploy();
     dgvc2 = await DGVC.deploy();
 
