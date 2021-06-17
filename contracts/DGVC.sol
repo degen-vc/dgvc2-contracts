@@ -23,15 +23,15 @@ contract DGVC is IDGVC, Context, Ownable {
     uint private constant _DECIMALFACTOR = 10 ** uint(_DECIMALS);
     uint private constant _GRANULARITY = 100;
 
-    uint private _tTotal = 100000000 * _DECIMALFACTOR;
-    uint private _rTotal = (_MAX - (_MAX % _tTotal));
+    uint private _actualTotal = 100000000 * _DECIMALFACTOR;
+    uint private _reflectionTotal = (_MAX - (_MAX % _actualTotal));
 
-    uint private _tFeeTotal;
-    uint private _tBurnTotal;
+    uint private _actualFeeTotal;
+    uint private _actualBurnTotal;
     uint private _infinityCycle;
 
-    uint private _tTradeCycle;
-    uint private _tBurnCycle;
+    uint private _actualTradeCycle;
+    uint private _actualBurnCycle;
 
     uint private _BURN_FEE;
     uint private _FOT_FEE;
@@ -39,11 +39,11 @@ contract DGVC is IDGVC, Context, Ownable {
 
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
 
-    constructor (address _router) public {
-        _reflectionOwned[_msgSender()] = _rTotal;
+    constructor(address _router) public {
+        _reflectionOwned[_msgSender()] = _reflectionTotal;
         router = _router;
         setMaxCycles(500);
-        emit Transfer(address(0), _msgSender(), _tTotal);
+        emit Transfer(address(0), _msgSender(), _actualTotal);
     }
 
     function name() public pure returns (string memory) {
@@ -59,7 +59,7 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function totalSupply() public view override returns (uint) {
-        return _tTotal;
+        return _actualTotal;
     }
 
     function balanceOf(address account) public view override returns (uint) {
@@ -93,11 +93,11 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function totalFees() public view returns (uint) {
-        return _tFeeTotal;
+        return _actualFeeTotal;
     }
 
     function totalBurn() public view returns (uint) {
-        return _tBurnTotal;
+        return _actualBurnTotal;
     }
 
     function setFeeReceiver(address receiver) external onlyOwner() returns (bool) {
@@ -107,23 +107,23 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function totalBurnWithFees() public view returns (uint) {
-        return _tBurnTotal + _tFeeTotal;
+        return _actualBurnTotal + _actualFeeTotal;
     }
 
     function reflectionFromToken(uint transferAmount, bool deductTransferFee) public view returns(uint) {
-        require(transferAmount <= _tTotal, "Amount must be less than supply");
+        require(transferAmount <= _actualTotal, "Amount must be less than supply");
         if (!deductTransferFee) {
-            (uint rAmount,,,,,) = _getValues(transferAmount);
-            return rAmount;
+            (uint reflectionAmount,,,,,) = _getValues(transferAmount);
+            return reflectionAmount;
         } else {
-            (,uint rTransferAmount,,,,) = _getValues(transferAmount);
-            return rTransferAmount;
+            (,uint reflectionTransferAmount,,,,) = _getValues(transferAmount);
+            return reflectionTransferAmount;
         }
     }
 
-    function tokenFromReflection(uint rAmount) public view returns(uint) {
-        require(rAmount <= _rTotal, "Amount must be less than total reflections");
-        return rAmount / _getRate();
+    function tokenFromReflection(uint reflectionAmount) public view returns(uint) {
+        require(reflectionAmount <= _reflectionTotal, "Amount must be less than total reflections");
+        return reflectionAmount / _getRate();
     }
 
     function excludeAccount(address account) external onlyOwner() {
@@ -173,39 +173,39 @@ contract DGVC is IDGVC, Context, Ownable {
         // @dev 50% fee is burn fee, 50% is fot
         if (_BURN_FEE >= 250) {
 
-            _tTradeCycle = _tTradeCycle + amount;
+            _actualTradeCycle = _actualTradeCycle + amount;
 
 
         // @dev adjust current burnFee/fotFee depending on the traded tokens
-            if (_tTradeCycle >= (0 * _DECIMALFACTOR) && _tTradeCycle <= (1000000 * _DECIMALFACTOR)) {
+            if (_actualTradeCycle >= (0 * _DECIMALFACTOR) && _actualTradeCycle <= (1000000 * _DECIMALFACTOR)) {
                 _setFees(500);
-            } else if (_tTradeCycle > (1000000 * _DECIMALFACTOR) && _tTradeCycle <= (2000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (1000000 * _DECIMALFACTOR) && _actualTradeCycle <= (2000000 * _DECIMALFACTOR)) {
                 _setFees(550);
-            }   else if (_tTradeCycle > (2000000 * _DECIMALFACTOR) && _tTradeCycle <= (3000000 * _DECIMALFACTOR)) {
+            }   else if (_actualTradeCycle > (2000000 * _DECIMALFACTOR) && _actualTradeCycle <= (3000000 * _DECIMALFACTOR)) {
                 _setFees(600);
-            }   else if (_tTradeCycle > (3000000 * _DECIMALFACTOR) && _tTradeCycle <= (4000000 * _DECIMALFACTOR)) {
+            }   else if (_actualTradeCycle > (3000000 * _DECIMALFACTOR) && _actualTradeCycle <= (4000000 * _DECIMALFACTOR)) {
                 _setFees(650);
-            } else if (_tTradeCycle > (4000000 * _DECIMALFACTOR) && _tTradeCycle <= (5000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (4000000 * _DECIMALFACTOR) && _actualTradeCycle <= (5000000 * _DECIMALFACTOR)) {
                 _setFees(700);
-            } else if (_tTradeCycle > (5000000 * _DECIMALFACTOR) && _tTradeCycle <= (6000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (5000000 * _DECIMALFACTOR) && _actualTradeCycle <= (6000000 * _DECIMALFACTOR)) {
                 _setFees(750);
-            } else if (_tTradeCycle > (6000000 * _DECIMALFACTOR) && _tTradeCycle <= (7000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (6000000 * _DECIMALFACTOR) && _actualTradeCycle <= (7000000 * _DECIMALFACTOR)) {
                 _setFees(800);
-            } else if (_tTradeCycle > (7000000 * _DECIMALFACTOR) && _tTradeCycle <= (8000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (7000000 * _DECIMALFACTOR) && _actualTradeCycle <= (8000000 * _DECIMALFACTOR)) {
                 _setFees(850);
-            } else if (_tTradeCycle > (8000000 * _DECIMALFACTOR) && _tTradeCycle <= (9000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (8000000 * _DECIMALFACTOR) && _actualTradeCycle <= (9000000 * _DECIMALFACTOR)) {
                 _setFees(900);
-            } else if (_tTradeCycle > (9000000 * _DECIMALFACTOR) && _tTradeCycle <= (10000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (9000000 * _DECIMALFACTOR) && _actualTradeCycle <= (10000000 * _DECIMALFACTOR)) {
                 _setFees(950);
-            } else if (_tTradeCycle > (10000000 * _DECIMALFACTOR) && _tTradeCycle <= (11000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (10000000 * _DECIMALFACTOR) && _actualTradeCycle <= (11000000 * _DECIMALFACTOR)) {
                 _setFees(1000);
-            } else if (_tTradeCycle > (11000000 * _DECIMALFACTOR) && _tTradeCycle <= (12000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (11000000 * _DECIMALFACTOR) && _actualTradeCycle <= (12000000 * _DECIMALFACTOR)) {
                 _setFees(1050);
-            } else if (_tTradeCycle > (12000000 * _DECIMALFACTOR) && _tTradeCycle <= (13000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (12000000 * _DECIMALFACTOR) && _actualTradeCycle <= (13000000 * _DECIMALFACTOR)) {
                 _setFees(1100);
-            } else if (_tTradeCycle > (13000000 * _DECIMALFACTOR) && _tTradeCycle <= (14000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (13000000 * _DECIMALFACTOR) && _actualTradeCycle <= (14000000 * _DECIMALFACTOR)) {
                 _setFees(1150);
-            } else if (_tTradeCycle > (14000000 * _DECIMALFACTOR)) {
+            } else if (_actualTradeCycle > (14000000 * _DECIMALFACTOR)) {
                 _setFees(1200);
             }
         }
@@ -225,15 +225,15 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferStandard(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn * currentRate;
-        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
-        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        uint reflectionBurn =  transferBurn * currentRate;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + reflectionTransferAmount;
 
-        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + reflectionFee;
 
-        _burnAndRebase(rBurn, transferFee, transferBurn);
-        emit Transfer(sender, recipient, tTransferAmount);
+        _burnAndRebase(reflectionBurn, transferFee, transferBurn);
+        emit Transfer(sender, recipient, actualTransferAmount);
 
         if (transferFee > 0) {
             emit Transfer(sender, feeReceiver, transferFee);
@@ -242,16 +242,16 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferToExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn * currentRate;
-        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
-        _actualOwned[recipient] = _actualOwned[recipient] + tTransferAmount;
-        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        uint reflectionBurn =  transferBurn * currentRate;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
+        _actualOwned[recipient] = _actualOwned[recipient] + actualTransferAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + reflectionTransferAmount;
 
-        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + reflectionFee;
 
-        _burnAndRebase(rBurn, transferFee, transferBurn);
-        emit Transfer(sender, recipient, tTransferAmount);
+        _burnAndRebase(reflectionBurn, transferFee, transferBurn);
+        emit Transfer(sender, recipient, actualTransferAmount);
 
         if (transferFee > 0) {
             emit Transfer(sender, feeReceiver, transferFee);
@@ -260,16 +260,16 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferFromExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn * currentRate;
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        uint reflectionBurn =  transferBurn * currentRate;
         _actualOwned[sender] = _actualOwned[sender] - transferAmount;
-        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
-        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + reflectionTransferAmount;
 
-        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + reflectionFee;
 
-        _burnAndRebase(rBurn, transferFee, transferBurn);
-        emit Transfer(sender, recipient, tTransferAmount);
+        _burnAndRebase(reflectionBurn, transferFee, transferBurn);
+        emit Transfer(sender, recipient, actualTransferAmount);
 
         if (transferFee > 0) {
             emit Transfer(sender, feeReceiver, transferFee);
@@ -278,37 +278,37 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferBothExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn * currentRate;
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        uint reflectionBurn =  transferBurn * currentRate;
         _actualOwned[sender] = _actualOwned[sender] - transferAmount;
-        _reflectionOwned[sender] = _reflectionOwned[sender] - rAmount;
-        _actualOwned[recipient] = _actualOwned[recipient] + tTransferAmount;
-        _reflectionOwned[recipient] = _reflectionOwned[recipient] + rTransferAmount;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
+        _actualOwned[recipient] = _actualOwned[recipient] + actualTransferAmount;
+        _reflectionOwned[recipient] = _reflectionOwned[recipient] + reflectionTransferAmount;
 
-        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + rFee;
+        _reflectionOwned[feeReceiver] = _reflectionOwned[feeReceiver] + reflectionFee;
 
-        _burnAndRebase(rBurn, transferFee, transferBurn);
-        emit Transfer(sender, recipient, tTransferAmount);
+        _burnAndRebase(reflectionBurn, transferFee, transferBurn);
+        emit Transfer(sender, recipient, actualTransferAmount);
 
         if (transferFee > 0) {
             emit Transfer(sender, feeReceiver, transferFee);
         }
     }
 
-    function _burnAndRebase(uint rBurn, uint transferFee, uint transferBurn) private {
-        _rTotal = _rTotal - rBurn;
-        _tFeeTotal = _tFeeTotal + transferFee;
-        _tBurnTotal = _tBurnTotal + transferBurn;
-        _tBurnCycle = _tBurnCycle + transferBurn + transferFee;
-        _tTotal = _tTotal - transferBurn;
+    function _burnAndRebase(uint reflectionBurn, uint transferFee, uint transferBurn) private {
+        _reflectionTotal = _reflectionTotal - reflectionBurn;
+        _actualFeeTotal = _actualFeeTotal + transferFee;
+        _actualBurnTotal = _actualBurnTotal + transferBurn;
+        _actualBurnCycle = _actualBurnCycle + transferBurn + transferFee;
+        _actualTotal = _actualTotal - transferBurn;
 
 
         // @dev after 1,275,000 tokens burnt, supply is expanded by 500,000 tokens 
-        if (_tBurnCycle >= (1275000 * _DECIMALFACTOR)) {
+        if (_actualBurnCycle >= (1275000 * _DECIMALFACTOR)) {
                 //set rebase percent
                 uint _tRebaseDelta = 500000 * _DECIMALFACTOR;
-                _tBurnCycle = _tBurnCycle - (1275000 * _DECIMALFACTOR);
-                _tTradeCycle = 0;
+                _actualBurnCycle = _actualBurnCycle - (1275000 * _DECIMALFACTOR);
+                _actualTradeCycle = 0;
                 _setFees(500);
 
                 _rebase(_tRebaseDelta);
@@ -321,54 +321,54 @@ contract DGVC is IDGVC, Context, Ownable {
         require(balance >= amount, "Cannot burn more than on balance");
         require(sender == feeReceiver, "Only feeReceiver");
 
-        uint rBurn =  amount * _getRate();
-        _rTotal = _rTotal - rBurn;
-        _reflectionOwned[sender] = _reflectionOwned[sender] - rBurn;
+        uint reflectionBurn =  amount * _getRate();
+        _reflectionTotal = _reflectionTotal - reflectionBurn;
+        _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionBurn;
 
-        _tBurnTotal = _tBurnTotal + amount;
-        _tTotal = _tTotal - amount;
+        _actualBurnTotal = _actualBurnTotal + amount;
+        _actualTotal = _actualTotal - amount;
 
         emit Transfer(sender, address(0), amount);
         return true;
     }
 
     function _getValues(uint transferAmount) private view returns (uint, uint, uint, uint, uint, uint) {
-        (uint tTransferAmount, uint transferFee, uint transferBurn) = _getTValues(transferAmount, _FOT_FEE, _BURN_FEE);
-        (uint rAmount, uint rTransferAmount, uint rFee) = _getRValues(transferAmount, transferFee, transferBurn);
-        return (rAmount, rTransferAmount, rFee, tTransferAmount, transferFee, transferBurn);
+        (uint actualTransferAmount, uint transferFee, uint transferBurn) = _getActualValues(transferAmount, _FOT_FEE, _BURN_FEE);
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee) = _getReflectionValues(transferAmount, transferFee, transferBurn);
+        return (reflectionAmount, reflectionTransferAmount, reflectionFee, actualTransferAmount, transferFee, transferBurn);
     }
 
-    function _getTValues(uint transferAmount, uint fotFee, uint burnFee) private pure returns (uint, uint, uint) {
+    function _getActualValues(uint transferAmount, uint fotFee, uint burnFee) private pure returns (uint, uint, uint) {
         uint transferFee = transferAmount * fotFee /_GRANULARITY / 100;
         uint transferBurn = transferAmount * burnFee / _GRANULARITY / 100;
-        uint tTransferAmount = transferAmount - transferFee - transferBurn;
-        return (tTransferAmount, transferFee, transferBurn);
+        uint actualTransferAmount = transferAmount - transferFee - transferBurn;
+        return (actualTransferAmount, transferFee, transferBurn);
     }
 
-    function _getRValues(uint transferAmount, uint transferFee, uint transferBurn) private view returns (uint, uint, uint) {
+    function _getReflectionValues(uint transferAmount, uint transferFee, uint transferBurn) private view returns (uint, uint, uint) {
         uint currentRate =  _getRate();
-        uint rAmount = transferAmount * currentRate;
-        uint rFee = transferFee * currentRate;
-        uint rBurn = transferBurn * currentRate;
-        uint rTransferAmount = rAmount - rFee - rBurn;
-        return (rAmount, rTransferAmount, rFee);
+        uint reflectionAmount = transferAmount * currentRate;
+        uint reflectionFee = transferFee * currentRate;
+        uint reflectionBurn = transferBurn * currentRate;
+        uint reflectionTransferAmount = reflectionAmount - reflectionFee - reflectionBurn;
+        return (reflectionAmount, reflectionTransferAmount, reflectionFee);
     }
 
     function _getRate() private view returns(uint) {
-        (uint rSupply, uint tSupply) = _getCurrentSupply();
-        return rSupply / tSupply;
+        (uint reflectionSupply, uint actualSupply) = _getCurrentSupply();
+        return reflectionSupply / actualSupply;
     }
 
     function _getCurrentSupply() private view returns(uint, uint) {
-        uint rSupply = _rTotal;
-        uint tSupply = _tTotal;
+        uint reflectionSupply = _reflectionTotal;
+        uint actualSupply = _actualTotal;
         for (uint i = 0; i < _excluded.length; i++) {
-            if (_reflectionOwned[_excluded[i]] > rSupply || _actualOwned[_excluded[i]] > tSupply) return (_rTotal, _tTotal);
-            rSupply = rSupply - _reflectionOwned[_excluded[i]];
-            tSupply = tSupply - _actualOwned[_excluded[i]];
+            if (_reflectionOwned[_excluded[i]] > reflectionSupply || _actualOwned[_excluded[i]] > actualSupply) return (_reflectionTotal, _actualTotal);
+            reflectionSupply = reflectionSupply - _reflectionOwned[_excluded[i]];
+            actualSupply = actualSupply - _actualOwned[_excluded[i]];
         }
-        if (rSupply < _rTotal / _tTotal) return (_rTotal, _tTotal);
-        return (rSupply, tSupply);
+        if (reflectionSupply < _reflectionTotal / _actualTotal) return (_reflectionTotal, _actualTotal);
+        return (reflectionSupply, actualSupply);
     }
 
 
@@ -410,16 +410,16 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function getBurnCycle() public view returns(uint) {
-        return _tBurnCycle;
+        return _actualBurnCycle;
     }
 
     function getTradedCycle() public view returns(uint) {
-        return _tTradeCycle;
+        return _actualTradeCycle;
     }
 
     function _rebase(uint supplyDelta) internal {
         _infinityCycle = _infinityCycle + 1;
-        _tTotal = _tTotal + supplyDelta;
+        _actualTotal = _actualTotal + supplyDelta;
 
         if (_infinityCycle > maxCycles) {
             _setFees(0);
