@@ -2,15 +2,9 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IInfinityProtocol.sol";
 
 contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
-
-    using SafeMath for uint;
-    using Address for address;
-
     mapping (address => uint) private _rOwned;
     mapping (address => uint) private _tOwned;
     mapping (address => mapping (address => uint)) private _allowances;
@@ -21,11 +15,11 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     address public router;
     uint public maxCycles;
 
-    string  private constant _NAME = "infinityprotocol.io";
-    string  private constant _SYMBOL = "INFINITY";
-    uint8   private constant _DECIMALS = 8;
+    string  private constant _NAME = "Degen.vc";
+    string  private constant _SYMBOL = "DGVC";
+    uint8   private constant _DECIMALS = 18;
 
-    uint private constant _MAX = ~uint(0);
+    uint private constant _MAX = type(uint).max;
     uint private constant _DECIMALFACTOR = 10 ** uint(_DECIMALS);
     uint private constant _GRANULARITY = 100;
 
@@ -89,17 +83,8 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
 
     function transferFrom(address sender, address recipient, uint amount) public override returns (bool) {
         _transfer(sender, recipient, amount);
-        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
-        return true;
-    }
-
-    function increaseAllowance(address spender, uint addedValue) public virtual returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
-        return true;
-    }
-
-    function decreaseAllowance(address spender, uint subtractedValue) public virtual returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
+        require(_allowances[sender][_msgSender()] >= amount, "ERC20: transfer amount exceeds allowance");
+        _approve(sender, _msgSender(), _allowances[sender][_msgSender()] - amount);
         return true;
     }
 
@@ -122,7 +107,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     }
 
     function totalBurnWithFees() public view returns (uint) {
-        return _tBurnTotal.add(_tFeeTotal);
+        return _tBurnTotal + _tFeeTotal;
     }
 
     function reflectionFromToken(uint transferAmount, bool deductTransferFee) public view returns(uint) {
@@ -138,8 +123,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
 
     function tokenFromReflection(uint rAmount) public view returns(uint) {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
-        uint currentRate = _getRate();
-        return rAmount.div(currentRate);
+        return rAmount / _getRate();
     }
 
     function excludeAccount(address account) external onlyOwner() {
@@ -189,7 +173,7 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         // @dev 50% fee is burn fee, 50% is fot
         if (_BURN_FEE >= 250) {
 
-            _tTradeCycle = _tTradeCycle.add(amount);
+            _tTradeCycle = _tTradeCycle + amount;
 
 
         // @dev adjust current burnFee/fotFee depending on the traded tokens
@@ -242,11 +226,11 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     function _transferStandard(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn.mul(currentRate);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        uint rBurn =  transferBurn * currentRate;
+        _rOwned[sender] = _rOwned[sender] - rAmount;
+        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver].add(rFee);
+        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -259,12 +243,12 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     function _transferToExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn.mul(currentRate);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        uint rBurn =  transferBurn * currentRate;
+        _rOwned[sender] = _rOwned[sender] - rAmount;
+        _tOwned[recipient] = _tOwned[recipient] + tTransferAmount;
+        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver].add(rFee);
+        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -277,12 +261,12 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     function _transferFromExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn.mul(currentRate);
-        _tOwned[sender] = _tOwned[sender].sub(transferAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        uint rBurn =  transferBurn * currentRate;
+        _tOwned[sender] = _tOwned[sender] - transferAmount;
+        _rOwned[sender] = _rOwned[sender] - rAmount;
+        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver].add(rFee);
+        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -295,13 +279,13 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     function _transferBothExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
         (uint rAmount, uint rTransferAmount, uint rFee, uint tTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
-        uint rBurn =  transferBurn.mul(currentRate);
-        _tOwned[sender] = _tOwned[sender].sub(transferAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        uint rBurn =  transferBurn * currentRate;
+        _tOwned[sender] = _tOwned[sender] - transferAmount;
+        _rOwned[sender] = _rOwned[sender] - rAmount;
+        _tOwned[recipient] = _tOwned[recipient] + tTransferAmount;
+        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount;
 
-        _rOwned[feeReceiver] = _rOwned[feeReceiver].add(rFee);
+        _rOwned[feeReceiver] = _rOwned[feeReceiver] + rFee;
 
         _burnAndRebase(rBurn, transferFee, transferBurn);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -312,18 +296,18 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     }
 
     function _burnAndRebase(uint rBurn, uint transferFee, uint transferBurn) private {
-        _rTotal = _rTotal.sub(rBurn);
-        _tFeeTotal = _tFeeTotal.add(transferFee);
-        _tBurnTotal = _tBurnTotal.add(transferBurn);
-        _tBurnCycle = _tBurnCycle.add(transferBurn).add(transferFee);
-        _tTotal = _tTotal.sub(transferBurn);
+        _rTotal = _rTotal - rBurn;
+        _tFeeTotal = _tFeeTotal + transferFee;
+        _tBurnTotal = _tBurnTotal + transferBurn;
+        _tBurnCycle = _tBurnCycle + transferBurn + transferFee;
+        _tTotal = _tTotal - transferBurn;
 
 
         // @dev after 1,275,000 tokens burnt, supply is expanded by 500,000 tokens 
         if (_tBurnCycle >= (1275000 * _DECIMALFACTOR)) {
                 //set rebase percent
                 uint _tRebaseDelta = 500000 * _DECIMALFACTOR;
-                _tBurnCycle = _tBurnCycle.sub((1275000 * _DECIMALFACTOR));
+                _tBurnCycle = _tBurnCycle - (1275000 * _DECIMALFACTOR);
                 _tTradeCycle = 0;
                 _setFees(500);
 
@@ -337,12 +321,12 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         require(balance >= amount, "Cannot burn more than on balance");
         require(sender == feeReceiver, "Only feeReceiver");
 
-        uint rBurn =  amount.mul(_getRate());
-        _rTotal = _rTotal.sub(rBurn);
-        _rOwned[sender] = _rOwned[sender].sub(rBurn);
+        uint rBurn =  amount * _getRate();
+        _rTotal = _rTotal - rBurn;
+        _rOwned[sender] = _rOwned[sender] - rBurn;
 
-        _tBurnTotal = _tBurnTotal.add(amount);
-        _tTotal = _tTotal.sub(amount);
+        _tBurnTotal = _tBurnTotal + amount;
+        _tTotal = _tTotal - amount;
 
         emit Transfer(sender, address(0), amount);
         return true;
@@ -355,24 +339,24 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     }
 
     function _getTValues(uint transferAmount, uint fotFee, uint burnFee) private pure returns (uint, uint, uint) {
-        uint transferFee = ((transferAmount.mul(fotFee)).div(_GRANULARITY)).div(100);
-        uint transferBurn = ((transferAmount.mul(burnFee)).div(_GRANULARITY)).div(100);
-        uint tTransferAmount = transferAmount.sub(transferFee).sub(transferBurn);
+        uint transferFee = transferAmount * fotFee /_GRANULARITY / 100;
+        uint transferBurn = transferAmount * burnFee / _GRANULARITY / 100;
+        uint tTransferAmount = transferAmount - transferFee - transferBurn;
         return (tTransferAmount, transferFee, transferBurn);
     }
 
     function _getRValues(uint transferAmount, uint transferFee, uint transferBurn) private view returns (uint, uint, uint) {
         uint currentRate =  _getRate();
-        uint rAmount = transferAmount.mul(currentRate);
-        uint rFee = transferFee.mul(currentRate);
-        uint rBurn = transferBurn.mul(currentRate);
-        uint rTransferAmount = rAmount.sub(rFee).sub(rBurn);
+        uint rAmount = transferAmount * currentRate;
+        uint rFee = transferFee * currentRate;
+        uint rBurn = transferBurn * currentRate;
+        uint rTransferAmount = rAmount - rFee - rBurn;
         return (rAmount, rTransferAmount, rFee);
     }
 
     function _getRate() private view returns(uint) {
         (uint rSupply, uint tSupply) = _getCurrentSupply();
-        return rSupply.div(tSupply);
+        return rSupply / tSupply;
     }
 
     function _getCurrentSupply() private view returns(uint, uint) {
@@ -380,22 +364,22 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
         uint tSupply = _tTotal;
         for (uint i = 0; i < _excluded.length; i++) {
             if (_rOwned[_excluded[i]] > rSupply || _tOwned[_excluded[i]] > tSupply) return (_rTotal, _tTotal);
-            rSupply = rSupply.sub(_rOwned[_excluded[i]]);
-            tSupply = tSupply.sub(_tOwned[_excluded[i]]);
+            rSupply = rSupply - _rOwned[_excluded[i]];
+            tSupply = tSupply - _tOwned[_excluded[i]];
         }
-        if (rSupply < _rTotal.div(_tTotal)) return (_rTotal, _tTotal);
+        if (rSupply < _rTotal / _tTotal) return (_rTotal, _tTotal);
         return (rSupply, tSupply);
     }
 
 
     function _setFees(uint fee) private {
         require(fee >= 0 && fee <= 1500, "fee should be in 0 - 15%");
-        if (_BURN_FEE == fee.div(2)) {
+        if (_BURN_FEE == fee / 2) {
             return;
         }
 
-        _BURN_FEE = fee.div(2);
-        _FOT_FEE = fee.div(2);
+        _BURN_FEE = fee / 2;
+        _FOT_FEE = fee / 2;
     }
 
     function setInitialFee() external onlyOwner() {
@@ -434,8 +418,8 @@ contract InfinityProtocol is IInfinityProtocol, Context, Ownable {
     }
 
     function _rebase(uint supplyDelta) internal {
-        _infinityCycle = _infinityCycle.add(1);
-        _tTotal = _tTotal.add(supplyDelta);
+        _infinityCycle = _infinityCycle + 1;
+        _tTotal = _tTotal + supplyDelta;
 
         if (_infinityCycle > maxCycles) {
             _setFees(0);

@@ -9,7 +9,7 @@ const { expect } = require('chai');
 
     const router = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
     const ganache = new Ganache();
-    const baseUnit = 8;
+    const baseUnit = 18;
     const totalSupply = utils.parseUnits('100000000', baseUnit);
     const HUNDRED_PERCENT = bn('10000');
 
