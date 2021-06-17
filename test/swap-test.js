@@ -1,14 +1,8 @@
 const Ganache = require('./helpers/ganache');
-const assert = require('assert');
-const { BigNumber, utils } = require('ethers');
 const { expect } = require('chai');
 
 describe('Swap', function() {
-  const bn = (input) => BigNumber.from(input);
-  const assertBNequal = (bnOne, bnTwo) => assert.strictEqual(bnOne.toString(), bnTwo.toString());
-  
-  const BASE_UNIT = bn('1000000000000000000');
-  const TRANSFER_AMOUNT = bn('10000').mul(BASE_UNIT);
+  const TRANSFER_AMOUNT = utils.parseUnits('10000').toBigInt();
 
   const ganache = new Ganache();
 
@@ -39,7 +33,7 @@ describe('Swap', function() {
   });
 
   it('should revert swap if balance is 0', async function() {
-    assertBNequal(await dgvc.balanceOf(user.address), 0);
+    expect(await dgvc.balanceOf(user.address)).to.equal(0);
     await expect(swap.connect(user).swap()).to.be.revertedWith('Nothing to swap');
   });
 
@@ -51,7 +45,7 @@ describe('Swap', function() {
     await dgvc2.transfer(swap.address, TRANSFER_AMOUNT);
     await dgvc.transfer(user.address, TRANSFER_AMOUNT);
 
-    assertBNequal(await dgvc2.balanceOf(swap.address), TRANSFER_AMOUNT);
+    expect(await dgvc2.balanceOf(swap.address)).to.equal(TRANSFER_AMOUNT);
 
     await expect(swap.connect(user).swap()).to.be.revertedWith('ERC20: transfer amount exceeds allowance');
   });
@@ -61,10 +55,10 @@ describe('Swap', function() {
     await dgvc.transfer(user.address, TRANSFER_AMOUNT);
     await dgvc.connect(user).approve(swap.address, TRANSFER_AMOUNT);
 
-    assertBNequal(await dgvc2.balanceOf(swap.address), TRANSFER_AMOUNT);
+    expect(await dgvc2.balanceOf(swap.address)).to.equal(TRANSFER_AMOUNT);
 
     await swap.connect(user).swap();
 
-    assertBNequal(await dgvc2.balanceOf(user.address), TRANSFER_AMOUNT);
+    expect(await dgvc2.balanceOf(user.address)).to.equal(TRANSFER_AMOUNT);
   });
 });
