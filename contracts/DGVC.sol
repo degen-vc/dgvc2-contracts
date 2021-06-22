@@ -8,6 +8,14 @@ contract DGVC is IDGVC, Context, Ownable {
     mapping (address => uint) private _reflectionOwned;
     mapping (address => uint) private _actualOwned;
     mapping (address => mapping (address => uint)) private _allowances;
+    mapping (address => uint) public customFOT;
+    mapping (address => DexFOT) public dexFOT;
+
+    struct DexFOT {
+      uint16 buy;
+      uint16 sell;
+   }
+
 
     mapping (address => bool) private _isExcluded;
     address[] private _excluded;
@@ -21,7 +29,7 @@ contract DGVC is IDGVC, Context, Ownable {
 
     uint private constant _MAX = type(uint).max;
     uint private constant _DECIMALFACTOR = 10 ** uint(_DECIMALS);
-    uint private constant _GRANULARITY = 100;
+    uint private constant _DIVIDER = 10000;
 
     uint private _actualTotal = 100000000 * _DECIMALFACTOR;
     uint private _reflectionTotal = (_MAX - (_MAX % _actualTotal));
@@ -33,8 +41,8 @@ contract DGVC is IDGVC, Context, Ownable {
     uint private _actualTradeCycle;
     uint private _actualBurnCycle;
 
-    uint private _BURN_FEE;
-    uint private _FOT_FEE;
+    uint private burnFee;
+    uint public commonFotFee;
     bool private _feeSet;
 
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
@@ -113,10 +121,10 @@ contract DGVC is IDGVC, Context, Ownable {
     function reflectionFromToken(uint transferAmount, bool deductTransferFee) public view returns(uint) {
         require(transferAmount <= _actualTotal, "Amount must be less than supply");
         if (!deductTransferFee) {
-            (uint reflectionAmount,,,,,) = _getValues(transferAmount);
+            (uint reflectionAmount,,,,,) = _getValues(transferAmount, address(0), address(0));
             return reflectionAmount;
         } else {
-            (,uint reflectionTransferAmount,,,,) = _getValues(transferAmount);
+            (,uint reflectionTransferAmount,,,,) = _getValues(transferAmount, address(0), address(0));
             return reflectionTransferAmount;
         }
     }
@@ -171,7 +179,7 @@ contract DGVC is IDGVC, Context, Ownable {
             require(amount <= _MAX_TX_SIZE, "Transfer amount exceeds the maxTxAmount.");
 
         // @dev 50% fee is burn fee, 50% is fot
-        if (_BURN_FEE >= 250) {
+        if (burnFee >= 250) {
 
             _actualTradeCycle = _actualTradeCycle + amount;
 
@@ -225,7 +233,7 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferStandard(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount, sender, recipient);
         uint reflectionBurn =  transferBurn * currentRate;
         _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
         _reflectionOwned[recipient] = _reflectionOwned[recipient] + reflectionTransferAmount;
@@ -242,7 +250,7 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferToExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount, sender, recipient);
         uint reflectionBurn =  transferBurn * currentRate;
         _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
         _actualOwned[recipient] = _actualOwned[recipient] + actualTransferAmount;
@@ -260,7 +268,7 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferFromExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount, sender, recipient);
         uint reflectionBurn =  transferBurn * currentRate;
         _actualOwned[sender] = _actualOwned[sender] - transferAmount;
         _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
@@ -278,7 +286,7 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _transferBothExcluded(address sender, address recipient, uint transferAmount) private {
         uint currentRate =  _getRate();
-        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount);
+        (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee, uint actualTransferAmount, uint transferFee, uint transferBurn) = _getValues(transferAmount, sender, recipient);
         uint reflectionBurn =  transferBurn * currentRate;
         _actualOwned[sender] = _actualOwned[sender] - transferAmount;
         _reflectionOwned[sender] = _reflectionOwned[sender] - reflectionAmount;
@@ -332,15 +340,32 @@ contract DGVC is IDGVC, Context, Ownable {
         return true;
     }
 
-    function _getValues(uint transferAmount) private view returns (uint, uint, uint, uint, uint, uint) {
-        (uint actualTransferAmount, uint transferFee, uint transferBurn) = _getActualValues(transferAmount, _FOT_FEE, _BURN_FEE);
+    function _getFee(address sender, address recipient) private view returns (uint fotFee) {
+        // buy
+        if (dexFOT[sender].buy > 0  || dexFOT[sender].sell > 0) {
+            fotFee = dexFOT[sender].buy;
+        // sell
+        } else if (dexFOT[recipient].buy > 0 || dexFOT[recipient].sell > 0) {
+            fotFee = dexFOT[sender].sell;
+        }
+        // custom fot
+        else if (customFOT[sender] > 0) {
+            fotFee = customFOT[sender];
+        // common fot
+        } else {
+            fotFee = commonFotFee;
+        }
+    }
+
+    function _getValues(uint transferAmount, address sender, address recipient) private view returns (uint, uint, uint, uint, uint, uint) {
+        (uint actualTransferAmount, uint transferFee, uint transferBurn) = _getActualValues(transferAmount, _getFee(sender, recipient), burnFee);
         (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee) = _getReflectionValues(transferAmount, transferFee, transferBurn);
         return (reflectionAmount, reflectionTransferAmount, reflectionFee, actualTransferAmount, transferFee, transferBurn);
     }
 
     function _getActualValues(uint transferAmount, uint fotFee, uint burnFee) private pure returns (uint, uint, uint) {
-        uint transferFee = transferAmount * fotFee /_GRANULARITY / 100;
-        uint transferBurn = transferAmount * burnFee / _GRANULARITY / 100;
+        uint transferFee = transferAmount * fotFee / _DIVIDER;
+        uint transferBurn = transferAmount * burnFee / _DIVIDER;
         uint actualTransferAmount = transferAmount - transferFee - transferBurn;
         return (actualTransferAmount, transferFee, transferBurn);
     }
@@ -374,12 +399,35 @@ contract DGVC is IDGVC, Context, Ownable {
 
     function _setFees(uint fee) private {
         require(fee >= 0 && fee <= 1500, "fee should be in 0 - 15%");
-        if (_BURN_FEE == fee / 2) {
+        if (burnFee == fee / 2) {
             return;
         }
 
-        _BURN_FEE = fee / 2;
-        _FOT_FEE = fee / 2;
+        burnFee = fee / 2;
+        commonFotFee = fee / 2;
+    }
+
+    function setUserCustomFee(address account, uint fee) external onlyOwner() {
+        require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
+        require(account != address(0), "Zero address not allowed");
+        customFOT[account] = fee;
+    }
+
+    function setDexFee(address pair, uint16 buyFee, uint16 sellFee) external onlyOwner() {
+        require(pair != address(0), "Zero address not allowed");
+        require(buyFee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
+        require(sellFee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
+        dexFOT[pair] = DexFOT(buyFee, sellFee);
+    }
+
+    function setCommonFee(uint fee) external onlyOwner() {
+        require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
+        commonFotFee = fee;
+    }
+
+    function setBurnFee(uint fee) external onlyOwner() {
+        require(commonFotFee + fee <= _DIVIDER, "Total fee should be in 0 - 100%");
+        burnFee = fee;
     }
 
     function setInitialFee() external onlyOwner() {
@@ -394,11 +442,11 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function getBurnFee() public view returns(uint)  {
-        return _BURN_FEE;
+        return burnFee;
     }
 
     function getFee() public view returns(uint)  {
-        return _FOT_FEE;
+        return commonFotFee;
     }
 
     function _getMaxTxAmount() private pure returns(uint) {
