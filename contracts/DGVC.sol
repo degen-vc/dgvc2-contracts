@@ -8,13 +8,21 @@ contract DGVC is IDGVC, Context, Ownable {
     mapping (address => uint) private _reflectionOwned;
     mapping (address => uint) private _actualOwned;
     mapping (address => mapping (address => uint)) private _allowances;
-    mapping (address => uint) public customFOT;
+    mapping (address => CustomFees) public customFees;
     mapping (address => DexFOT) public dexFOT;
 
     struct DexFOT {
-      uint16 buy;
-      uint16 sell;
-   }
+        bool enabled;
+        uint16 buy;
+        uint16 sell;
+        uint16 burn;
+    }
+
+    struct CustomFees {
+       bool enabled;
+       uint16 fot;
+       uint16 burn;
+    }
 
 
     mapping (address => bool) private _isExcluded;
@@ -38,10 +46,17 @@ contract DGVC is IDGVC, Context, Ownable {
 
     uint private _actualBurnCycle;
 
-    uint private burnFee;
+    uint private commonBurnFee;
     uint public commonFotFee;
 
+    uint public rebaseDelta;
+    uint public burnCycle;
+
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
+
+    event BurnCycleSet(uint cycle);
+    event RebaseDeltaSet(uint delta);
+    event Rebase(uint rebased);
 
     constructor(address _router) public {
         _reflectionOwned[_msgSender()] = _reflectionTotal;
@@ -103,7 +118,7 @@ contract DGVC is IDGVC, Context, Ownable {
         return _actualBurnTotal;
     }
 
-    function setFeeReceiver(address receiver) external onlyOwner() returns (bool) {
+    function setFeeReceiver(address receiver) external onlyOwner returns (bool) {
         require(receiver != address(0), "Zero address not allowed");
         feeReceiver = receiver;
         return true;
@@ -129,7 +144,7 @@ contract DGVC is IDGVC, Context, Ownable {
         return reflectionAmount / _getRate();
     }
 
-    function excludeAccount(address account) external onlyOwner() {
+    function excludeAccount(address account) external onlyOwner {
         require(!_isExcluded[account], "Account is already excluded");
         require(account != router, 'Not allowed to exclude router');
         require(account != feeReceiver, "Can not exclude fee receiver");
@@ -140,7 +155,7 @@ contract DGVC is IDGVC, Context, Ownable {
         _excluded.push(account);
     }
 
-    function includeAccount(address account) external onlyOwner() {
+    function includeAccount(address account) external onlyOwner {
         require(_isExcluded[account], "Account is already included");
         for (uint i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
@@ -165,10 +180,6 @@ contract DGVC is IDGVC, Context, Ownable {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-
-        // @dev once all cycles are completed, burn fee will be set to 0 and the protocol
-        // reaches its final phase, in which no further supply elasticity will take place
-        // and fees will stay at 0
 
         if (sender != owner() && recipient != owner())
             require(amount <= _MAX_TX_SIZE, "Transfer amount exceeds the maxTxAmount.");
@@ -262,23 +273,13 @@ contract DGVC is IDGVC, Context, Ownable {
         _reflectionTotal = _reflectionTotal - reflectionBurn;
         _actualFeeTotal = _actualFeeTotal + transferFee;
         _actualBurnTotal = _actualBurnTotal + transferBurn;
-        _actualBurnCycle = _actualBurnCycle + transferBurn + transferFee;
+        _actualBurnCycle = _actualBurnCycle + transferBurn;
         _actualTotal = _actualTotal - transferBurn;
 
 
-
-        // TODO 
-        // 1. remove cycles
-        // 2. do not include transferFee in _actualBurnCycle
-        // 3. set burnCycleLimit for ownable (1275000)
-        // 4. set expand tokens amount (500000)
-        // @dev after 1,275,000 tokens burnt, supply is expanded by 500,000 tokens 
-        if (_actualBurnCycle >= (1275000 * _DECIMALFACTOR)) {
-            //set rebase percent
-            uint _tRebaseDelta = 500000 * _DECIMALFACTOR;
-            _actualBurnCycle = _actualBurnCycle - (1275000 * _DECIMALFACTOR);
-
-            _rebase(_tRebaseDelta);
+        if (_actualBurnCycle >= burnCycle) {
+            _actualBurnCycle = _actualBurnCycle - burnCycle;
+            _rebase();
         }
     }
 
@@ -299,30 +300,31 @@ contract DGVC is IDGVC, Context, Ownable {
         return true;
     }
 
-    function _getFee(address sender, address recipient) private view returns (uint fotFee) {
-        // buy
-        if (dexFOT[sender].buy > 0  || dexFOT[sender].sell > 0) {
-            fotFee = dexFOT[sender].buy;
-        // sell
-        } else if (dexFOT[recipient].buy > 0 || dexFOT[recipient].sell > 0) {
-            fotFee = dexFOT[sender].sell;
+    function _getFee(address sender, address recipient) private view returns (uint fotFee, uint burnFee) {
+        DexFOT memory dexFotSender = dexFOT[sender];
+        DexFOT memory dexFotRecepient = dexFOT[recipient];
+        CustomFees memory _customFees = customFees[sender];
+
+        if (dexFotSender.enabled) {
+            return (dexFotSender.buy, dexFotSender.burn);
+        } else if (dexFotRecepient.enabled) {
+            return (dexFotRecepient.sell, dexFotRecepient.burn);
         }
-        // custom fot
-        else if (customFOT[sender] > 0) {
-            fotFee = customFOT[sender];
-        // common fot
+        else if (_customFees.enabled) {
+            return (_customFees.fot, _customFees.burn);
         } else {
-            fotFee = commonFotFee;
+            return (commonFotFee, commonBurnFee);
         }
     }
 
     function _getValues(uint transferAmount, address sender, address recipient) private view returns (uint, uint, uint, uint, uint, uint) {
-        (uint actualTransferAmount, uint transferFee, uint transferBurn) = _getActualValues(transferAmount, _getFee(sender, recipient), burnFee);
+        (uint actualTransferAmount, uint transferFee, uint transferBurn) = _getActualValues(transferAmount, sender, recipient);
         (uint reflectionAmount, uint reflectionTransferAmount, uint reflectionFee) = _getReflectionValues(transferAmount, transferFee, transferBurn);
         return (reflectionAmount, reflectionTransferAmount, reflectionFee, actualTransferAmount, transferFee, transferBurn);
     }
 
-    function _getActualValues(uint transferAmount, uint fotFee, uint burnFee) private pure returns (uint, uint, uint) {
+    function _getActualValues(uint transferAmount, address sender, address recipient) private view returns (uint, uint, uint) {
+        (uint fotFee, uint burnFee) = _getFee(sender, recipient);
         uint transferFee = transferAmount * fotFee / _DIVIDER;
         uint transferBurn = transferAmount * burnFee / _DIVIDER;
         uint actualTransferAmount = transferAmount - transferFee - transferBurn;
@@ -355,31 +357,41 @@ contract DGVC is IDGVC, Context, Ownable {
         return (reflectionSupply, actualSupply);
     }
 
-    function setUserCustomFee(address account, uint fee) external onlyOwner() {
+    function setUserCustomFee(address account, uint16 fee, uint16 burnFee) external onlyOwner {
         require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
         require(account != address(0), "Zero address not allowed");
-        customFOT[account] = fee;
+        customFees[account] = CustomFees(true, fee, burnFee);
     }
 
-    function setDexFee(address pair, uint16 buyFee, uint16 sellFee) external onlyOwner() {
+    function setDexFee(address pair, uint16 buyFee, uint16 sellFee, uint16 burnFee) external onlyOwner {
         require(pair != address(0), "Zero address not allowed");
         require(buyFee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
         require(sellFee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
-        dexFOT[pair] = DexFOT(buyFee, sellFee);
+        dexFOT[pair] = DexFOT(true, buyFee, sellFee, burnFee);
     }
 
-    function setCommonFee(uint fee) external onlyOwner() {
-        require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
+    function setCommonFee(uint fee) external onlyOwner {
+        require(fee + commonBurnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
         commonFotFee = fee;
     }
 
-    function setBurnFee(uint fee) external onlyOwner() {
+    function setBurnFee(uint fee) external onlyOwner {
         require(commonFotFee + fee <= _DIVIDER, "Total fee should be in 0 - 100%");
-        burnFee = fee;
+        commonBurnFee = fee;
+    }
+
+    function setBurnCycle(uint cycle) external onlyOwner {
+        burnCycle = cycle;
+        emit BurnCycleSet(burnCycle);
+    }
+
+    function setRebaseDelta(uint delta) external onlyOwner {
+        rebaseDelta = delta;
+        emit RebaseDeltaSet(rebaseDelta);
     }
 
     function getBurnFee() public view returns(uint)  {
-        return burnFee;
+        return commonBurnFee;
     }
 
     function getFee() public view returns(uint)  {
@@ -394,7 +406,8 @@ contract DGVC is IDGVC, Context, Ownable {
         return _actualBurnCycle;
     }
 
-    function _rebase(uint supplyDelta) internal {
-        _actualTotal = _actualTotal + supplyDelta;
+    function _rebase() internal {
+        _actualTotal = _actualTotal + rebaseDelta;
+        emit Rebase(rebaseDelta);
     }
 }

@@ -11,6 +11,8 @@ const { expect } = require('chai');
     const ganache = new Ganache();
     const baseUnit = 18;
     const totalSupply = utils.parseUnits('100000000', baseUnit).toBigInt();
+    const burnCycle = utils.parseUnits('1275000', baseUnit).toBigInt();
+    const rebaseDelta = utils.parseUnits('500000', baseUnit).toBigInt();
     const HUNDRED_PERCENT = 10000n;
 
     let accounts;
@@ -31,6 +33,9 @@ const { expect } = require('chai');
       const DGVC = await ethers.getContractFactory('DGVC');
       dgvc = await DGVC.deploy(router);
       await dgvc.deployed();
+
+      await dgvc.setRebaseDelta(rebaseDelta);
+      await dgvc.setBurnCycle(burnCycle)
 
       await ganache.snapshot();
     });
@@ -94,7 +99,7 @@ const { expect } = require('chai');
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -129,7 +134,7 @@ const { expect } = require('chai');
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -151,7 +156,6 @@ const { expect } = require('chai');
     });
 
     it('should be possible reach 15 trade cycles, fees auto set to 12%, 6% - to burn and 6% fot, check total supply after rebase', async function() {
-      const feeStart = 500n;
       const partFee = 250n;
 
       expect(await dgvc.getBurnFee()).to.equal(0);
@@ -165,14 +169,14 @@ const { expect } = require('chai');
       let amount = utils.parseUnits('1000001', baseUnit).toBigInt();
       let fee = 250n;
 
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < 50; i++) {
         await dgvc.transfer(user.address, amount);
 
         expect(await dgvc.getBurnFee()).to.equal(fee);
         expect(await dgvc.getFee()).to.equal(fee);
       }
 
-      amount = utils.parseUnits('416656', baseUnit).toBigInt();
+      amount = utils.parseUnits('916656', baseUnit).toBigInt();
       await dgvc.transfer(user.address, amount);
       expect(await dgvc.getBurnFee()).to.equal(fee);
       expect(await dgvc.getFee()).to.equal(fee);
@@ -224,7 +228,7 @@ const { expect } = require('chai');
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
 
@@ -271,7 +275,7 @@ const { expect } = require('chai');
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       const feeReceiverBalance = amount * partFee / HUNDRED_PERCENT;
@@ -313,7 +317,7 @@ const { expect } = require('chai');
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       const feeReceiverBalance = amount * partFee / HUNDRED_PERCENT;
@@ -354,7 +358,7 @@ const { expect } = require('chai');
       await dgvc.transfer(owner.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - (amount * fee / HUNDRED_PERCENT));
@@ -364,7 +368,6 @@ const { expect } = require('chai');
     });
 
     it('should be possible reach 15 trade cycles with needed checks and burn with rebase WITH admin burns, check latest total supply', async function() {
-      const feeStart = 500n;
       const partFee = 250n;
 
       expect(await dgvc.getBurnFee()).to.equal(0);
@@ -378,7 +381,7 @@ const { expect } = require('chai');
       let amount = utils.parseUnits('1000001', baseUnit).toBigInt();
       let fee = 250n;
 
-      for (let i = 0; i < 23; i++) {
+      for (let i = 0; i < 48; i++) {
         await dgvc.transfer(user.address, amount);
         expect(await dgvc.getBurnFee()).to.equal(fee);
         expect(await dgvc.getFee()).to.equal(fee);
@@ -402,17 +405,16 @@ const { expect } = require('chai');
       expect(await dgvc.getFee()).to.equal(fee);
 
       await dgvc.transfer(user.address, amount);
-      
+
       expect(await dgvc.getBurnFee()).to.equal(fee);
       expect(await dgvc.getFee()).to.equal(fee);
 
       await dgvc.transfer(user.address, amount);
-      
       expect(await dgvc.getBurnFee()).to.equal(fee);
       expect(await dgvc.getFee()).to.equal(fee);
 
 
-      amount = utils.parseUnits('416656', baseUnit);
+      amount = utils.parseUnits('916656', baseUnit);
       await dgvc.transfer(user.address, amount);
       expect(await dgvc.getBurnFee()).to.equal(fee);
       expect(await dgvc.getFee()).to.equal(fee);
@@ -479,7 +481,7 @@ const { expect } = require('chai');
       await dgvc.connect(userTwo).transferFrom(owner.address, user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -552,7 +554,7 @@ const { expect } = require('chai');
       await dgvc.connect(userTwo).transferFrom(owner.address, user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * fee / HUNDRED_PERCENT);
+      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
