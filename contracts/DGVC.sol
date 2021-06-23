@@ -21,7 +21,6 @@ contract DGVC is IDGVC, Context, Ownable {
     address[] private _excluded;
     address public feeReceiver;
     address public router;
-    uint public maxCycles;
 
     string  private constant _NAME = "Degen.vc";
     string  private constant _SYMBOL = "DGVC";
@@ -36,21 +35,17 @@ contract DGVC is IDGVC, Context, Ownable {
 
     uint private _actualFeeTotal;
     uint private _actualBurnTotal;
-    uint private _infinityCycle;
 
-    uint private _actualTradeCycle;
     uint private _actualBurnCycle;
 
     uint private burnFee;
     uint public commonFotFee;
-    bool private _feeSet;
 
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
 
     constructor(address _router) public {
         _reflectionOwned[_msgSender()] = _reflectionTotal;
         router = _router;
-        setMaxCycles(500);
         emit Transfer(address(0), _msgSender(), _actualTotal);
     }
 
@@ -178,46 +173,6 @@ contract DGVC is IDGVC, Context, Ownable {
         if (sender != owner() && recipient != owner())
             require(amount <= _MAX_TX_SIZE, "Transfer amount exceeds the maxTxAmount.");
 
-        // @dev 50% fee is burn fee, 50% is fot
-        if (burnFee >= 250) {
-
-            _actualTradeCycle = _actualTradeCycle + amount;
-
-
-        // @dev adjust current burnFee/fotFee depending on the traded tokens
-            if (_actualTradeCycle >= (0 * _DECIMALFACTOR) && _actualTradeCycle <= (1000000 * _DECIMALFACTOR)) {
-                _setFees(500);
-            } else if (_actualTradeCycle > (1000000 * _DECIMALFACTOR) && _actualTradeCycle <= (2000000 * _DECIMALFACTOR)) {
-                _setFees(550);
-            }   else if (_actualTradeCycle > (2000000 * _DECIMALFACTOR) && _actualTradeCycle <= (3000000 * _DECIMALFACTOR)) {
-                _setFees(600);
-            }   else if (_actualTradeCycle > (3000000 * _DECIMALFACTOR) && _actualTradeCycle <= (4000000 * _DECIMALFACTOR)) {
-                _setFees(650);
-            } else if (_actualTradeCycle > (4000000 * _DECIMALFACTOR) && _actualTradeCycle <= (5000000 * _DECIMALFACTOR)) {
-                _setFees(700);
-            } else if (_actualTradeCycle > (5000000 * _DECIMALFACTOR) && _actualTradeCycle <= (6000000 * _DECIMALFACTOR)) {
-                _setFees(750);
-            } else if (_actualTradeCycle > (6000000 * _DECIMALFACTOR) && _actualTradeCycle <= (7000000 * _DECIMALFACTOR)) {
-                _setFees(800);
-            } else if (_actualTradeCycle > (7000000 * _DECIMALFACTOR) && _actualTradeCycle <= (8000000 * _DECIMALFACTOR)) {
-                _setFees(850);
-            } else if (_actualTradeCycle > (8000000 * _DECIMALFACTOR) && _actualTradeCycle <= (9000000 * _DECIMALFACTOR)) {
-                _setFees(900);
-            } else if (_actualTradeCycle > (9000000 * _DECIMALFACTOR) && _actualTradeCycle <= (10000000 * _DECIMALFACTOR)) {
-                _setFees(950);
-            } else if (_actualTradeCycle > (10000000 * _DECIMALFACTOR) && _actualTradeCycle <= (11000000 * _DECIMALFACTOR)) {
-                _setFees(1000);
-            } else if (_actualTradeCycle > (11000000 * _DECIMALFACTOR) && _actualTradeCycle <= (12000000 * _DECIMALFACTOR)) {
-                _setFees(1050);
-            } else if (_actualTradeCycle > (12000000 * _DECIMALFACTOR) && _actualTradeCycle <= (13000000 * _DECIMALFACTOR)) {
-                _setFees(1100);
-            } else if (_actualTradeCycle > (13000000 * _DECIMALFACTOR) && _actualTradeCycle <= (14000000 * _DECIMALFACTOR)) {
-                _setFees(1150);
-            } else if (_actualTradeCycle > (14000000 * _DECIMALFACTOR)) {
-                _setFees(1200);
-            }
-        }
-
         if (_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferFromExcluded(sender, recipient, amount);
         } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
@@ -311,15 +266,19 @@ contract DGVC is IDGVC, Context, Ownable {
         _actualTotal = _actualTotal - transferBurn;
 
 
+
+        // TODO 
+        // 1. remove cycles
+        // 2. do not include transferFee in _actualBurnCycle
+        // 3. set burnCycleLimit for ownable (1275000)
+        // 4. set expand tokens amount (500000)
         // @dev after 1,275,000 tokens burnt, supply is expanded by 500,000 tokens 
         if (_actualBurnCycle >= (1275000 * _DECIMALFACTOR)) {
-                //set rebase percent
-                uint _tRebaseDelta = 500000 * _DECIMALFACTOR;
-                _actualBurnCycle = _actualBurnCycle - (1275000 * _DECIMALFACTOR);
-                _actualTradeCycle = 0;
-                _setFees(500);
+            //set rebase percent
+            uint _tRebaseDelta = 500000 * _DECIMALFACTOR;
+            _actualBurnCycle = _actualBurnCycle - (1275000 * _DECIMALFACTOR);
 
-                _rebase(_tRebaseDelta);
+            _rebase(_tRebaseDelta);
         }
     }
 
@@ -396,17 +355,6 @@ contract DGVC is IDGVC, Context, Ownable {
         return (reflectionSupply, actualSupply);
     }
 
-
-    function _setFees(uint fee) private {
-        require(fee >= 0 && fee <= 1500, "fee should be in 0 - 15%");
-        if (burnFee == fee / 2) {
-            return;
-        }
-
-        burnFee = fee / 2;
-        commonFotFee = fee / 2;
-    }
-
     function setUserCustomFee(address account, uint fee) external onlyOwner() {
         require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
         require(account != address(0), "Zero address not allowed");
@@ -430,17 +378,6 @@ contract DGVC is IDGVC, Context, Ownable {
         burnFee = fee;
     }
 
-    function setInitialFee() external onlyOwner() {
-        require(!_feeSet, "Initial fee already set");
-        _setFees(500);
-        _feeSet = true;
-    }
-
-    function setMaxCycles(uint _maxCycles) public onlyOwner() {
-        require(_maxCycles >= _infinityCycle, "Can not set more than current cycle");
-        maxCycles = _maxCycles;
-    }
-
     function getBurnFee() public view returns(uint)  {
         return burnFee;
     }
@@ -453,24 +390,11 @@ contract DGVC is IDGVC, Context, Ownable {
         return _MAX_TX_SIZE;
     }
 
-    function getCycle() public view returns(uint) {
-        return _infinityCycle;
-    }
-
     function getBurnCycle() public view returns(uint) {
         return _actualBurnCycle;
     }
 
-    function getTradedCycle() public view returns(uint) {
-        return _actualTradeCycle;
-    }
-
     function _rebase(uint supplyDelta) internal {
-        _infinityCycle = _infinityCycle + 1;
         _actualTotal = _actualTotal + supplyDelta;
-
-        if (_infinityCycle > maxCycles) {
-            _setFees(0);
-        }
     }
 }
