@@ -44,17 +44,17 @@ contract DGVC is IDGVC, Context, Ownable {
     uint private _actualFeeTotal;
     uint private _actualBurnTotal;
 
-    uint private _actualBurnCycle;
+    uint public actualBurnCycle;
 
-    uint private commonBurnFee;
+    uint public commonBurnFee;
     uint public commonFotFee;
 
     uint public rebaseDelta;
-    uint public burnCycle;
+    uint public burnCycleLimit;
 
     uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
 
-    event BurnCycleSet(uint cycle);
+    event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
     event Rebase(uint rebased);
 
@@ -122,10 +122,6 @@ contract DGVC is IDGVC, Context, Ownable {
         require(receiver != address(0), "Zero address not allowed");
         feeReceiver = receiver;
         return true;
-    }
-
-    function totalBurnWithFees() public view returns (uint) {
-        return _actualBurnTotal + _actualFeeTotal;
     }
 
     function reflectionFromToken(uint transferAmount, bool deductTransferFee) public view returns(uint) {
@@ -273,12 +269,12 @@ contract DGVC is IDGVC, Context, Ownable {
         _reflectionTotal = _reflectionTotal - reflectionBurn;
         _actualFeeTotal = _actualFeeTotal + transferFee;
         _actualBurnTotal = _actualBurnTotal + transferBurn;
-        _actualBurnCycle = _actualBurnCycle + transferBurn;
+        actualBurnCycle = actualBurnCycle + transferBurn;
         _actualTotal = _actualTotal - transferBurn;
 
 
-        if (_actualBurnCycle >= burnCycle) {
-            _actualBurnCycle = _actualBurnCycle - burnCycle;
+        if (actualBurnCycle >= burnCycleLimit) {
+            actualBurnCycle = actualBurnCycle - burnCycleLimit;
             _rebase();
         }
     }
@@ -300,7 +296,7 @@ contract DGVC is IDGVC, Context, Ownable {
         return true;
     }
 
-    function _getFee(address sender, address recipient) private view returns (uint fotFee, uint burnFee) {
+    function _commonFotFee(address sender, address recipient) private view returns (uint fotFee, uint burnFee) {
         DexFOT memory dexFotSender = dexFOT[sender];
         DexFOT memory dexFotRecepient = dexFOT[recipient];
         CustomFees memory _customFees = customFees[sender];
@@ -324,7 +320,7 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function _getActualValues(uint transferAmount, address sender, address recipient) private view returns (uint, uint, uint) {
-        (uint fotFee, uint burnFee) = _getFee(sender, recipient);
+        (uint fotFee, uint burnFee) = _commonFotFee(sender, recipient);
         uint transferFee = transferAmount * fotFee / _DIVIDER;
         uint transferBurn = transferAmount * burnFee / _DIVIDER;
         uint actualTransferAmount = transferAmount - transferFee - transferBurn;
@@ -380,30 +376,14 @@ contract DGVC is IDGVC, Context, Ownable {
         commonBurnFee = fee;
     }
 
-    function setBurnCycle(uint cycle) external onlyOwner {
-        burnCycle = cycle;
-        emit BurnCycleSet(burnCycle);
+    function setBurnCycle(uint cycleLimit) external onlyOwner {
+        burnCycleLimit = cycleLimit;
+        emit BurnCycleLimitSet(burnCycleLimit);
     }
 
     function setRebaseDelta(uint delta) external onlyOwner {
         rebaseDelta = delta;
         emit RebaseDeltaSet(rebaseDelta);
-    }
-
-    function getBurnFee() public view returns(uint)  {
-        return commonBurnFee;
-    }
-
-    function getFee() public view returns(uint)  {
-        return commonFotFee;
-    }
-
-    function _getMaxTxAmount() private pure returns(uint) {
-        return _MAX_TX_SIZE;
-    }
-
-    function getBurnCycle() public view returns(uint) {
-        return _actualBurnCycle;
     }
 
     function _rebase() internal {

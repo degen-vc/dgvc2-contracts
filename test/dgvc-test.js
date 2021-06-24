@@ -78,12 +78,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       const amount = utils.parseUnits('100', baseUnit).toBigInt();
@@ -92,14 +92,14 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -113,12 +113,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('1000000', baseUnit).toBigInt();
@@ -127,14 +127,14 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -143,27 +143,27 @@ const { expect } = require('chai');
 
       expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * partFee / HUNDRED_PERCENT));
 
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       // cycle reached
       amount = utils.parseUnits('1', baseUnit);
       await dgvc.connect(user).transfer(userTwo.address, amount);
 
       const increasedPartFee = 250n;
-      expect(await dgvc.getBurnFee()).to.equal(increasedPartFee);
-      expect(await dgvc.getFee()).to.equal(increasedPartFee);
+      expect(await dgvc.commonBurnFee()).to.equal(increasedPartFee);
+      expect(await dgvc.commonFotFee()).to.equal(increasedPartFee);
     });
 
     it('should be possible reach 15 trade cycles, fees auto set to 12%, 6% - to burn and 6% fot, check total supply after rebase', async function() {
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('1000001', baseUnit).toBigInt();
@@ -172,14 +172,14 @@ const { expect } = require('chai');
       for (let i = 0; i < 50; i++) {
         await dgvc.transfer(user.address, amount);
 
-        expect(await dgvc.getBurnFee()).to.equal(fee);
-        expect(await dgvc.getFee()).to.equal(fee);
+        expect(await dgvc.commonBurnFee()).to.equal(fee);
+        expect(await dgvc.commonFotFee()).to.equal(fee);
       }
 
       amount = utils.parseUnits('916656', baseUnit).toBigInt();
       await dgvc.transfer(user.address, amount);
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
 
 
       const supplyBeforeRebase = await dgvc.totalSupply();
@@ -199,20 +199,20 @@ const { expect } = require('chai');
       expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpected - 2n));
 
       fee = 250;
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
     });
 
     it('should be possible to make an admin burn for feeReceiver without trade cycles', async function() {
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('50000', baseUnit).toBigInt();
@@ -221,14 +221,14 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
 
@@ -240,8 +240,8 @@ const { expect } = require('chai');
 
       expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * partFee / HUNDRED_PERCENT));
 
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee(), partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee(), partFee);
 
       await expect(dgvc.connect(feeReceiver).burn(feeReceiverBalance)).to.emit(dgvc, 'Transfer');
 
@@ -254,12 +254,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('50000', baseUnit).toBigInt();
@@ -268,14 +268,14 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       const feeReceiverBalance = amount * partFee / HUNDRED_PERCENT;
@@ -286,8 +286,8 @@ const { expect } = require('chai');
 
       expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * partFee / HUNDRED_PERCENT));
 
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await expect(dgvc.connect(user).burn(feeReceiverBalance)).to.revertedWith('Only feeReceiver');
     });
@@ -296,12 +296,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('50000', baseUnit).toBigInt();
@@ -310,14 +310,14 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       const feeReceiverBalance = amount * partFee / HUNDRED_PERCENT;
@@ -328,8 +328,8 @@ const { expect } = require('chai');
 
       expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * partFee / HUNDRED_PERCENT));
 
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await expect(dgvc.connect(feeReceiver).burn(feeReceiverBalance + 1n)).to.revertedWith('Cannot burn more than on balance');
     });
@@ -338,12 +338,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       const amount = utils.parseUnits('100', baseUnit).toBigInt();
@@ -352,13 +352,13 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
       expect(await dgvc.totalBurn()).to.equal(0);
 
       await dgvc.transfer(owner.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - (amount * fee / HUNDRED_PERCENT));
@@ -370,12 +370,12 @@ const { expect } = require('chai');
     it('should be possible reach 15 trade cycles with needed checks and burn with rebase WITH admin burns, check latest total supply', async function() {
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('1000001', baseUnit).toBigInt();
@@ -383,14 +383,14 @@ const { expect } = require('chai');
 
       for (let i = 0; i < 48; i++) {
         await dgvc.transfer(user.address, amount);
-        expect(await dgvc.getBurnFee()).to.equal(fee);
-        expect(await dgvc.getFee()).to.equal(fee);
+        expect(await dgvc.commonBurnFee()).to.equal(fee);
+        expect(await dgvc.commonFotFee()).to.equal(fee);
       }
 
       let supplyBeforeBurn = await dgvc.totalSupply();
       let totalBurnBeforeBurn = await dgvc.totalBurn();
       let totalFeesBeforeBurn = await dgvc.totalFees();
-      let totalBurnWithFeesBeforeBurn = await dgvc.totalBurnWithFees();
+      let totalBurnWithFeesBeforeBurn = await dgvc.totalBurn();
       let feeReceiverBalance = await dgvc.balanceOf(feeReceiver.address);
       let amountToBurn = utils.parseUnits('500', baseUnit).toBigInt();
       await dgvc.connect(feeReceiver).burn(amountToBurn);
@@ -398,31 +398,31 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BNtoBigInt(feeReceiverBalance) - amountToBurn);
       expect(await dgvc.totalSupply()).to.equal(BNtoBigInt(supplyBeforeBurn) - amountToBurn);
       expect(await dgvc.totalBurn()).to.equal(BNtoBigInt(totalBurnBeforeBurn) + amountToBurn);
-      expect(await dgvc.totalBurnWithFees()).to.equal(BNtoBigInt(totalBurnWithFeesBeforeBurn) + amountToBurn);
+      expect(await dgvc.totalBurn()).to.equal(BNtoBigInt(totalBurnWithFeesBeforeBurn) + amountToBurn);
       expect(await dgvc.totalFees()).to.equal(totalFeesBeforeBurn);
 
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
 
       await dgvc.transfer(user.address, amount);
 
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
 
       await dgvc.transfer(user.address, amount);
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
 
 
       amount = utils.parseUnits('916656', baseUnit);
       await dgvc.transfer(user.address, amount);
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
 
       supplyBeforeBurn = BNtoBigInt(await dgvc.totalSupply());
       totalBurnBeforeBurn = await dgvc.totalBurn();
       totalFeesBeforeBurn = await dgvc.totalFees();
-      totalBurnWithFeesBeforeBurn = await dgvc.totalBurnWithFees();
+      totalBurnWithFeesBeforeBurn = await dgvc.totalBurn();
       feeReceiverBalance = await dgvc.balanceOf(feeReceiver.address);
       amountToBurn = utils.parseUnits('10000', baseUnit).toBigInt();
       await dgvc.connect(feeReceiver).burn(amountToBurn);
@@ -430,7 +430,7 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BNtoBigInt(feeReceiverBalance) - amountToBurn);
       expect(await dgvc.totalSupply()).to.equal(supplyBeforeBurn - amountToBurn);
       expect(await dgvc.totalBurn()).to.equal(BNtoBigInt(totalBurnBeforeBurn) + amountToBurn);
-      expect(await dgvc.totalBurnWithFees()).to.equal(BNtoBigInt(totalBurnWithFeesBeforeBurn) + amountToBurn);
+      expect(await dgvc.totalBurn()).to.equal(BNtoBigInt(totalBurnWithFeesBeforeBurn) + amountToBurn);
       expect(await dgvc.totalFees()).to.equal(totalFeesBeforeBurn);
 
       const supplyBeforeRebase = supplyBeforeBurn - amountToBurn;
@@ -450,8 +450,8 @@ const { expect } = require('chai');
 
 
       fee = 250;
-      expect(await dgvc.getBurnFee()).to.equal(fee);
-      expect(await dgvc.getFee()).to.equal(fee);
+      expect(await dgvc.commonBurnFee()).to.equal(fee);
+      expect(await dgvc.commonFotFee()).to.equal(fee);
     });
 
 
@@ -459,12 +459,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       const amount = utils.parseUnits('100', baseUnit).toBigInt();
@@ -473,7 +473,7 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
@@ -481,7 +481,7 @@ const { expect } = require('chai');
       await dgvc.connect(userTwo).transferFrom(owner.address, user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
@@ -495,12 +495,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       const amount = utils.parseUnits('100', baseUnit).toBigInt();
@@ -509,7 +509,7 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
@@ -518,7 +518,7 @@ const { expect } = require('chai');
       await expect(dgvc.connect(userTwo).transferFrom(owner.address, user.address, amount)).to.revertedWith('transfer amount exceeds allowance');
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
@@ -532,12 +532,12 @@ const { expect } = require('chai');
       const fee = 500n;
       const partFee = 250n;
 
-      expect(await dgvc.getBurnFee()).to.equal(0);
-      expect(await dgvc.getFee()).to.equal(0);
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
       await dgvc.setCommonFee(250);
       await dgvc.setBurnFee(250);
-      expect(await dgvc.getBurnFee()).to.equal(partFee);
-      expect(await dgvc.getFee()).to.equal(partFee);
+      expect(await dgvc.commonBurnFee()).to.equal(partFee);
+      expect(await dgvc.commonFotFee()).to.equal(partFee);
 
       await dgvc.setFeeReceiver(feeReceiver.address);
       const amount = utils.parseUnits('100', baseUnit).toBigInt();
@@ -546,7 +546,7 @@ const { expect } = require('chai');
       expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(0);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(0);
+      expect(await dgvc.actualBurnCycle()).to.equal(0);
 
       expect(await dgvc.totalBurn()).to.equal(0);
 
@@ -554,7 +554,7 @@ const { expect } = require('chai');
       await dgvc.connect(userTwo).transferFrom(owner.address, user.address, amount);
 
 
-      expect(await dgvc.getBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
+      expect(await dgvc.actualBurnCycle()).to.equal(amount * partFee / HUNDRED_PERCENT);
       expect(await dgvc.totalBurn()).to.equal(amount * partFee / HUNDRED_PERCENT);
 
       expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
