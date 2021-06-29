@@ -38,7 +38,7 @@ contract DGVC is IDGVC, Context, Ownable {
     uint private constant _DECIMALFACTOR = 10 ** uint(_DECIMALS);
     uint private constant _DIVIDER = 10000;
 
-    uint private _actualTotal = 100000000 * _DECIMALFACTOR;
+    uint private _actualTotal = 12000000 * _DECIMALFACTOR;
     uint private _reflectionTotal = (_MAX - (_MAX % _actualTotal));
 
     uint private _actualFeeTotal;
@@ -52,7 +52,7 @@ contract DGVC is IDGVC, Context, Ownable {
     uint public rebaseDelta;
     uint public burnCycleLimit;
 
-    uint private constant _MAX_TX_SIZE = 100000000 * _DECIMALFACTOR;
+    uint private constant _MAX_TX_SIZE = 12000000 * _DECIMALFACTOR;
 
     event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
