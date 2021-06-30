@@ -87,7 +87,7 @@ const { expect } = require('chai');
       const rebaseAmount = utils.parseUnits('1000000', baseUnit).toBigInt();
 
       transfersCount = 17n;
-      const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * burnCycleLimitSet / HUNDRED_PERCENT);
+      const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
 
       const balanceOwner = await dgvc.balanceOf(owner.address);
