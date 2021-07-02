@@ -26,15 +26,13 @@ describe('FeeDistributor', function() {
   let dgvc;
   let vaultFake;
 
-  beforeEach('setup others', async function() {
+  before('setup others', async function() {
     accounts = await ethers.getSigners();
     owner = accounts[0];
     user = accounts[1];
     feeReceiver = accounts[2];
     userTwo = accounts[3];
     vaultFake = accounts[4];
-
-    afterEach('revert', function() { return ganache.revert(); });
 
     const FeeDistributor = await ethers.getContractFactory('FeeDistributor');
     feeDistributor = await FeeDistributor.deploy();
@@ -44,6 +42,8 @@ describe('FeeDistributor', function() {
 
     await ganache.snapshot();
   });
+
+  afterEach('revert', function() { return ganache.revert(); });
 
   it('should be possible to change ownership', async function() {
     expect(await feeDistributor.owner()).to.equal(owner.address);

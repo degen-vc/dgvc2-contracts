@@ -15,12 +15,10 @@ describe('Swap', function() {
   let dgvc;
   let dgvc2;
 
-  beforeEach('setup', async function() {
+  before('setup', async function() {
     accounts = await ethers.getSigners();
     owner = accounts[0];
     user = accounts[1];
-
-    afterEach('revert', function() { return ganache.revert(); });
 
     const DGVC = await ethers.getContractFactory('DegenVC1');
     dgvc = await DGVC.deploy();
@@ -31,6 +29,8 @@ describe('Swap', function() {
 
     await ganache.snapshot();
   });
+
+  afterEach('revert', function() { return ganache.revert(); });
 
   it('should revert swap if balance is 0', async function() {
     expect(await dgvc.balanceOf(user.address)).to.equal(0);

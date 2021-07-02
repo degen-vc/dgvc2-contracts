@@ -22,13 +22,12 @@ const { expect } = require('chai');
     let feeReceiver;
     let userTwo;
 
-    beforeEach('setup others', async function() {
+    before('setup others', async function() {
       accounts = await ethers.getSigners();
       owner = accounts[0];
       user = accounts[1];
       feeReceiver = accounts[2];
       userTwo = accounts[3];
-      afterEach('revert', function() { return ganache.revert(); });
 
       const DGVC = await ethers.getContractFactory('DGVC');
       dgvc = await DGVC.deploy(router);
@@ -36,6 +35,8 @@ const { expect } = require('chai');
 
       await ganache.snapshot();
     });
+
+    afterEach('revert', function() { return ganache.revert(); });
 
     it('rebase delta set, burn limit set (rebase amount is MORE than burned amount). 1 User make transfers and reach rebase limit. check all balances, total supply after rebase.', async () => {
       burnCycle = utils.parseUnits('5000', baseUnit).toBigInt();
