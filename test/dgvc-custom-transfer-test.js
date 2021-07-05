@@ -110,7 +110,7 @@ describe('DGVC Custom Transfers', function() {
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
   });
 
-  // User has customFee. custom burn. DEX fees initiated and equals to zero. User buys 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well
+  // User has customFee. custom burn. DEX fees initiated. User buys 1000 tokens on dex, Check burn cycle increased, total supply decreased. Dex fees applied for buy operation.
   it.only('should be possible to do a custom fee transfer (buy operation) with DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const SELL_FEE = 600n;
@@ -169,11 +169,11 @@ describe('DGVC Custom Transfers', function() {
     expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(amount * BUY_FEE / HUNDRED_PERCENT);
   });
 
-  // User has customFee. custom burn. DEX fees initiated and equals to zero. User buys 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well
+  // User has customFee. custom burn. DEX fees initiated and equals to zero. User buys 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well.
   it.only('should be possible to do a custom fee transfer (buy operation) with zero values DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
-    const SELL_FEE = 500n;
-    const BUY_FEE = 500n;
+    const SELL_FEE = 600n;
+    const BUY_FEE = 400n;
     const ZERO_FEE = 0n;
 
     const totalSupplyBefore = await dgvc.totalSupply();
@@ -302,7 +302,7 @@ describe('DGVC Custom Transfers', function() {
     assert.isTrue(totalSupplyBefore.gt(totalSupplyAfter));
   });
 
-  // User has customFee. custom burn. DEX fees initiated and equals to zero. User sells 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well
+  // User has customFee. custom burn. DEX fees initiated and equals to zero. User sells 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well.
   it.only('should be possible to do a custom fee transfer (sell operation) with zero DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const SELL_FEE = 600n;
