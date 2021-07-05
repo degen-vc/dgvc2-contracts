@@ -21,7 +21,7 @@ describe('DGVC Custom Transfers', function() {
   const CUSTOM_FOT_FEE = 500n;
   const CUSTOM_BURN_FEE = 250n;
 
-  let accounts
+  let accounts;
   let dgvc;
   let owner;
   let user;
@@ -105,7 +105,7 @@ describe('DGVC Custom Transfers', function() {
 
     expect(await dgvc.actualBurnCycle()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalBurn()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
-    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * CUSTOM_FOT_FEE / HUNDRED_PERCENT) - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * (CUSTOM_FOT_FEE + CUSTOM_BURN_FEE) / HUNDRED_PERCENT));
     expect(await dgvc.balanceOf(feeReceiver.address), amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
   });
@@ -264,7 +264,7 @@ describe('DGVC Custom Transfers', function() {
     
     expect(await dgvc.actualBurnCycle()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalBurn()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
-    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * CUSTOM_FOT_FEE / HUNDRED_PERCENT) - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * (CUSTOM_FOT_FEE + CUSTOM_BURN_FEE) / HUNDRED_PERCENT));
     expect(await dgvc.balanceOf(feeReceiver.address), amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
 
@@ -333,7 +333,7 @@ describe('DGVC Custom Transfers', function() {
 
     expect(await dgvc.actualBurnCycle()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalBurn()).to.equal(amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
-    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * CUSTOM_FOT_FEE / HUNDRED_PERCENT) - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(amount - (amount * (CUSTOM_FOT_FEE + CUSTOM_BURN_FEE) / HUNDRED_PERCENT));
     expect(await dgvc.balanceOf(feeReceiver.address), amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
 
