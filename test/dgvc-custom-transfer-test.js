@@ -20,6 +20,7 @@ describe('DGVC Custom Transfers', function() {
   const HUNDRED_PERCENT = 10000n;
   const CUSTOM_FOT_FEE = 500n;
   const CUSTOM_BURN_FEE = 250n;
+  const DEX_BURN_FEE = 150n;
 
   let accounts;
   let dgvc;
@@ -78,7 +79,7 @@ describe('DGVC Custom Transfers', function() {
   afterEach('revert', function() { return ganache.revert(); });
 
   // User has customFee. custom burn. Transfers 1000 tokens, Check burn cycle increased, total supply decreased. Custom fees applied.
-  it.only('should be possible to do a custom transfer of 1000 DGVC for a user with custom fee / burn', async function () {
+  it('should be possible to do a custom transfer of 1000 DGVC for a user with custom fee / burn', async function () {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
 
     const { fot: customFeeBefore, burn: customBurnBefore } = await dgvc.customFees(user.address);
@@ -111,7 +112,7 @@ describe('DGVC Custom Transfers', function() {
   });
 
   // User has customFee. custom burn. DEX fees initiated. User buys 1000 tokens on dex, Check burn cycle increased, total supply decreased. Dex fees applied for buy operation.
-  it.only('should be possible to do a custom fee transfer (buy operation) with DEX fees initiated and custom fees initiated', async function() {
+  it('should be possible to do a custom fee transfer (buy operation) with DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const SELL_FEE = 600n;
     const BUY_FEE = 400n;
@@ -170,7 +171,7 @@ describe('DGVC Custom Transfers', function() {
   });
 
   // User has customFee. custom burn. DEX fees initiated and equals to zero. User buys 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well.
-  it.only('should be possible to do a custom fee transfer (buy operation) with zero values DEX fees initiated and custom fees initiated', async function() {
+  it('should be possible to do a custom fee transfer (buy operation) with zero values DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const SELL_FEE = 600n;
     const BUY_FEE = 400n;
@@ -235,10 +236,10 @@ describe('DGVC Custom Transfers', function() {
   });
 
   // User has customFee. custom burn. DEX fees initiated. User sells 1000 tokens on dex, Check burn cycle increased, total supply decreased. Dex fees applied for sell operation.
-  it.only('should be possible to do a custom fee transfer (sell operation) with DEX fees initiated and custom fees initiated', async function() {
+  it('should be possible to do a custom fee transfer (sell operation) with DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
-    const SELL_FEE = 600n;
-    const BUY_FEE = 400n;
+    const DEX_SELL_FEE = 600n;
+    const DEX_BUY_FEE = 400n;
 
     const { fot: customFeeBefore, burn: customBurnBefore } = await dgvc.customFees(user.address);
 
@@ -272,17 +273,20 @@ describe('DGVC Custom Transfers', function() {
 
     await dgvc.connect(userTwo).approve(uniswapRouter.address, userTwoAmount);
 
-    await dgvc.setDexFee(uniswapPair.address, BUY_FEE, SELL_FEE, CUSTOM_BURN_FEE);
+    await dgvc.setDexFee(uniswapPair.address, DEX_BUY_FEE, DEX_SELL_FEE, DEX_BURN_FEE);
 
     const { buy, sell, burn } = await dgvc.dexFOT(uniswapPair.address);
 
-    expect(buy).to.equal(BigInttoBN(BUY_FEE));
-    expect(sell).to.equal(BigInttoBN(SELL_FEE));
-    expect(burn).to.equal(BigInttoBN(CUSTOM_BURN_FEE));
+    expect(buy).to.equal(BigInttoBN(DEX_BUY_FEE));
+    expect(sell).to.equal(BigInttoBN(DEX_SELL_FEE));
+    expect(burn).to.equal(BigInttoBN(DEX_BURN_FEE));
 
     const actualBurnCycleBefore = await dgvc.actualBurnCycle();
+    const totalBurnBefore = await dgvc.totalBurn();
     const totalSupplyBefore = await dgvc.totalSupply();
+    const balanceOfFeeReceiverBefore = await dgvc.balanceOf(feeReceiver.address);
     const balanceBefore = await ethers.provider.getBalance(userTwo.address);
+    const uniswapPairBefore = await dgvc.balanceOf(uniswapPair.address);
 
     // swap with fees
     await uniswapRouter.connect(userTwo).swapExactTokensForETHSupportingFeeOnTransferTokens(
@@ -294,16 +298,18 @@ describe('DGVC Custom Transfers', function() {
     );
     
     const balanceAfter = await ethers.provider.getBalance(userTwo.address);
-    const actualBurnCycleAfter = await dgvc.actualBurnCycle();
-    const totalSupplyAfter = await dgvc.totalSupply();
-
     assert.isTrue(balanceAfter.gt(balanceBefore));
-    assert.isTrue(actualBurnCycleAfter.gt(actualBurnCycleBefore));
-    assert.isTrue(totalSupplyBefore.gt(totalSupplyAfter));
+
+    expect(await dgvc.actualBurnCycle()).to.equal(BNtoBigInt(actualBurnCycleBefore) + (BNtoBigInt(userTwoAmount) * DEX_BURN_FEE / HUNDRED_PERCENT));    
+    expect(await dgvc.totalBurn()).to.equal( BNtoBigInt(totalBurnBefore) + (BNtoBigInt(userTwoAmount) * DEX_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(0);
+    expect(await dgvc.balanceOf(feeReceiver.address), balanceOfFeeReceiverBefore + (BNtoBigInt(userTwoAmount) * DEX_SELL_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.totalSupply()).to.equal( BNtoBigInt(totalSupplyBefore) - (BNtoBigInt(userTwoAmount) * DEX_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(uniswapPair.address)).to.equal(BNtoBigInt(uniswapPairBefore) + (BNtoBigInt(userTwoAmount) - (BNtoBigInt(userTwoAmount) * (DEX_SELL_FEE + DEX_BURN_FEE) / HUNDRED_PERCENT)));   
   });
 
   // User has customFee. custom burn. DEX fees initiated and equals to zero. User sells 1000 tokens on dex, Check burn cycle the same, total supply the same. Dex fees not applied. Custom fees not applied as well.
-  it.only('should be possible to do a custom fee transfer (sell operation) with zero DEX fees initiated and custom fees initiated', async function() {
+  it('should be possible to do a custom fee transfer (sell operation) with zero DEX fees initiated and custom fees initiated', async function() {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const SELL_FEE = 600n;
     const BUY_FEE = 400n;
