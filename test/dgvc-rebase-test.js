@@ -253,4 +253,71 @@ const { expect } = require('chai');
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
       expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
     });
+
+    it('small burn cycle, rebase should happen', async () => {
+      burnCycle = utils.parseUnits('3', baseUnit).toBigInt();;
+      rebaseDelta = utils.parseUnits('200', baseUnit).toBigInt();
+
+      await dgvc.setRebaseDelta(rebaseDelta);
+      await dgvc.setBurnCycle(burnCycle)
+
+      const commonFee = 200n;
+      const commonBurnFee = 300n;
+
+      expect(await dgvc.commonBurnFee()).to.equal(0);
+      expect(await dgvc.commonFotFee()).to.equal(0);
+      await dgvc.setCommonFee(commonFee);
+      await dgvc.setBurnFee(commonBurnFee);
+      expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvc.commonFotFee()).to.equal(commonFee);
+
+      await dgvc.setFeeReceiver(feeReceiver.address);
+      let amount = utils.parseUnits('50', baseUnit).toBigInt();
+      
+      await dgvc.transfer(user.address, amount);
+
+      let transfersCount = 1n;
+      const totalSupplyBeforeRebase = await dgvc.totalSupply();
+      const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
+      expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
+
+      const ownerBalanceExpectedBeforeRebase = totalSupply - amount * transfersCount;
+      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
+
+      const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
+      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+
+      const feeReceiverBalanceExpectedBeforeRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
+      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+
+
+      await dgvc.transfer(user.address, amount);
+
+      const supplyAfterRebase = await dgvc.totalSupply();
+      const rebaseAmount = utils.parseUnits('200', baseUnit).toBigInt();
+
+      transfersCount = 2n;
+      const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
+
+      expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
+
+      const balanceOwner = await dgvc.balanceOf(owner.address);
+      const balanceUser = await dgvc.balanceOf(user.address);
+      const balanceFeeReceiver = await dgvc.balanceOf(feeReceiver.address);
+      expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpectedAfterRebase - 2n));
+
+      const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
+
+      const feeReceiverBalanceExpectedAfterRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
+      const feeReceiverRebaseShare = feeReceiverBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
+      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
+
+      const ownerBalanceExpectedAfterRebase = totalSupply - amount * transfersCount;
+      const ownerRebaseShare = ownerBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
+      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
+
+      const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
+      const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
+      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+    });
   });
