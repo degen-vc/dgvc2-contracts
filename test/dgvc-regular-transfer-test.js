@@ -26,7 +26,7 @@ describe('DGVC Regular Transfers', function() {
   let feeReceiver;
   let userTwo;
 
-  before('setup others', async function() {
+  before('setup others', async () => {
     accounts = await ethers.getSigners();
     owner = accounts[0];
     user = accounts[1];
@@ -103,7 +103,7 @@ describe('DGVC Regular Transfers', function() {
     expect(await dgvc.totalSupply()).to.equal(totalSupply);
   });
 
-  it('should be possible to do a regular transfer with common fee 2% and burn 0%', async function() {
+  it('should be possible to do a regular transfer with common fee 2% and burn 0%', async () => {
     const COMMON_FEE = 200n;
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
 
@@ -132,7 +132,7 @@ describe('DGVC Regular Transfers', function() {
     expect(await dgvc.totalSupply()).to.equal(totalSupply);
   });
 
-  it('should be possible to do a regular transfer with common fee 0% and burn 3%', async function() {
+  it('should be possible to do a regular transfer with common fee 0% and burn 3%', async () => {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
     const BURN_FEE = 300n;
 
@@ -163,7 +163,7 @@ describe('DGVC Regular Transfers', function() {
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * BURN_FEE / HUNDRED_PERCENT));
   });
 
-  it('should be possible to do a regular transfer of 1000 DGVC to the own address for a user with common fee / burn', async function () {
+  it('should be possible to do a regular transfer of 1000 DGVC to the own address for a user with common fee / burn', async () => {
     const amount = utils.parseUnits('1000', baseUnit).toBigInt();
 
     expect(await dgvc.commonBurnFee()).to.equal(0);
@@ -193,4 +193,88 @@ describe('DGVC Regular Transfers', function() {
 
     expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * PART_FEE / HUNDRED_PERCENT));
   });
+
+  it('should be possible to do a transferFrom of 1000 DGVC from user to user2 with common fee / burn', async () => {
+    const COMMON_FOT_FEE = 500n;
+    const COMMON_BURN_FEE = 300n;
+    const amount = utils.parseUnits('1000', baseUnit).toBigInt();
+
+    await dgvc.setCommonFee(COMMON_FOT_FEE);
+    await dgvc.setBurnFee(COMMON_BURN_FEE);
+
+    expect(await dgvc.commonBurnFee()).to.equal(COMMON_BURN_FEE);
+    expect(await dgvc.commonFotFee()).to.equal(COMMON_FOT_FEE);
+
+    await dgvc.setFeeReceiver(feeReceiver.address);
+
+    await dgvc.transfer(user.address, amount);
+
+    expect(await dgvc.actualBurnCycle()).to.equal(amount * COMMON_BURN_FEE / HUNDRED_PERCENT);
+    expect(await dgvc.totalBurn()).to.equal(amount * COMMON_BURN_FEE / HUNDRED_PERCENT);
+
+    expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
+    expect(await dgvc.balanceOf(user.address)).to.equal(amount - (amount * (COMMON_FOT_FEE + COMMON_BURN_FEE) / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(amount * COMMON_FOT_FEE / HUNDRED_PERCENT);
+
+    expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * COMMON_BURN_FEE / HUNDRED_PERCENT));
+
+    const userBalance = BNtoBigInt(await dgvc.balanceOf(user.address));
+    const feeReceiverBalance = BNtoBigInt(await dgvc.balanceOf(feeReceiver.address));
+    const totalSupplyAfter = BNtoBigInt(await dgvc.totalSupply());
+
+    await dgvc.connect(user).approve(owner.address, userBalance);
+
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(0);
+    expect(await dgvc.allowance(user.address, owner.address)).to.equal(userBalance);
+
+    await dgvc.transferFrom(user.address, userTwo.address, userBalance);
+
+    expect(await dgvc.allowance(user.address, owner.address)).to.equal(0);
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(userBalance - (userBalance * (COMMON_FOT_FEE + COMMON_BURN_FEE) / HUNDRED_PERCENT));
+    expect(await dgvc.totalSupply()).to.equal(totalSupplyAfter - (userBalance * COMMON_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(feeReceiverBalance + userBalance * COMMON_FOT_FEE / HUNDRED_PERCENT);
+  });
+
+  it('should be possible to do a transferFrom of 1000 DGVC from user to user2 with custom fee / burn', async () => {
+    const COMMON_FOT_FEE = 500n;
+    const COMMON_BURN_FEE = 300n;
+    const CUSTOM_FOT_FEE = 400n;
+    const CUSTOM_BURN_FEE = 200n;
+    const amount = utils.parseUnits('1000', baseUnit).toBigInt();
+
+    await dgvc.setCommonFee(COMMON_FOT_FEE);
+    await dgvc.setBurnFee(COMMON_BURN_FEE);
+
+    await dgvc.setUserCustomFee(user.address, CUSTOM_FOT_FEE, CUSTOM_BURN_FEE);
+
+    await dgvc.setFeeReceiver(feeReceiver.address);
+
+    await dgvc.transfer(user.address, amount);
+
+    expect(await dgvc.actualBurnCycle()).to.equal(amount * COMMON_BURN_FEE / HUNDRED_PERCENT);
+    expect(await dgvc.totalBurn()).to.equal(amount * COMMON_BURN_FEE / HUNDRED_PERCENT);
+
+    expect(await dgvc.balanceOf(owner.address)).to.equal(totalSupply - amount);
+    expect(await dgvc.balanceOf(user.address)).to.equal(amount - (amount * (COMMON_FOT_FEE + COMMON_BURN_FEE) / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(amount * COMMON_FOT_FEE / HUNDRED_PERCENT);
+
+    expect(await dgvc.totalSupply()).to.equal(totalSupply - (amount * COMMON_BURN_FEE / HUNDRED_PERCENT));
+
+    const userBalance = BNtoBigInt(await dgvc.balanceOf(user.address));
+    const feeReceiverBalance = BNtoBigInt(await dgvc.balanceOf(feeReceiver.address));
+    const totalSupplyAfter = BNtoBigInt(await dgvc.totalSupply());
+
+    await dgvc.connect(user).approve(owner.address, userBalance);
+
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(0);
+    expect(await dgvc.allowance(user.address, owner.address)).to.equal(userBalance);
+
+    await dgvc.transferFrom(user.address, userTwo.address, userBalance);
+
+    expect(await dgvc.allowance(user.address, owner.address)).to.equal(0);
+    expect(await dgvc.balanceOf(userTwo.address)).to.equal(userBalance - (userBalance * (CUSTOM_FOT_FEE + CUSTOM_BURN_FEE) / HUNDRED_PERCENT));
+    expect(await dgvc.totalSupply()).to.equal(totalSupplyAfter - (userBalance * CUSTOM_BURN_FEE / HUNDRED_PERCENT));
+    expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(feeReceiverBalance + userBalance * CUSTOM_FOT_FEE / HUNDRED_PERCENT);
+  });
+
 });
