@@ -7,9 +7,11 @@ const { expect, assert } = require('chai');
     const BNtoBigInt = (input) => BigInt(input.toString());
     const BigInttoBN = (input) => BigNumber.from(input.toString());
 
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const router = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
     const ganache = new Ganache();
     const baseUnit = 18;
+    
     const totalSupply = utils.parseUnits('12000000', baseUnit).toBigInt();
     const burnCycle = utils.parseUnits('5000', baseUnit).toBigInt();
     const rebaseDelta = utils.parseUnits('4000', baseUnit).toBigInt();
@@ -52,12 +54,12 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set feeRaceiver by owner', async function() {
-      assert.notStrictEqual(await dgvc.feeReceiver(), user.address);
+    it('should be possible to set feeReceiver by owner', async function() {
+      assert.equal(await dgvc.feeReceiver(), ZERO_ADDRESS);
 
       await expect(dgvc.setFeeReceiver(user.address));
 
-      assert.strictEqual(await dgvc.feeReceiver(), user.address);
+      assert.equal(await dgvc.feeReceiver(), user.address);
     });
 
     it('should revert excludeAccount() if caller is not the owner', async function() {
@@ -66,8 +68,8 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set excluded account by owner', async function() {
-      assert.isNotTrue(await dgvc.isExcluded(user.address));
+    it('should be possible to set excluded account by owner', async function() {
+      assert.isFalse(await dgvc.isExcluded(user.address));
 
       await expect(dgvc.excludeAccount(user.address));
       
@@ -80,14 +82,14 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set included account by owner', async function() {
-      assert.isNotTrue(await dgvc.isExcluded(user.address));
+    it('should be possible to set included account by owner', async function() {
+      assert.isFalse(await dgvc.isExcluded(user.address));
 
       await expect(dgvc.excludeAccount(user.address));
       assert.isTrue(await dgvc.isExcluded(user.address));
 
       await expect(dgvc.includeAccount(user.address));    
-      assert.isNotTrue(await dgvc.isExcluded(user.address));
+      assert.isFalse(await dgvc.isExcluded(user.address));
     });
 
     it('should revert setUserCustomFee() if caller is not the owner', async function() {
@@ -96,10 +98,10 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Custom Fees by owner', async function() {
+    it('should be possible to set Custom Fees by owner', async function() {
       const { enabled: userAddressBefore, fot: customFeeBefore, burn: customBurnBefore } = await dgvc.customFees(user.address);
 
-      assert.isNotTrue(userAddressBefore);
+      assert.isFalse(userAddressBefore);
       expect(customFeeBefore).to.be.equal(BigInttoBN(0));
       expect(customBurnBefore).to.be.equal(BigInttoBN(0));
 
@@ -118,10 +120,10 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Dex FOT by owner', async function() {
+    it('should be possible to set Dex FOT by owner', async function() {
       const { enabled: userAddressBefore, buy: dexBuyBefore, sell: dexSellBefore, burn: dexBurnBefore } = await dgvc.dexFOT(user.address);
 
-      assert.isNotTrue(userAddressBefore);
+      assert.isFalse(userAddressBefore);
       expect(dexBuyBefore).to.be.equal(BigInttoBN(0));
       expect(dexSellBefore).to.be.equal(BigInttoBN(0));
       expect(dexBurnBefore).to.be.equal(BigInttoBN(0));
@@ -142,7 +144,7 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Common Fot Fee by owner', async function() {
+    it('should be possible to set Common Fot Fee by owner', async function() {
       expect(await dgvc.commonFotFee()).to.be.equal(0);
 
       await dgvc.setCommonFee(CUSTOM_FOT_FEE);
@@ -156,7 +158,7 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Common Burn Fee by owner', async function() {
+    it('should be possible to set Common Burn Fee by owner', async function() {
       expect(await dgvc.commonBurnFee()).to.be.equal(0);
 
       await dgvc.setBurnFee(CUSTOM_BURN_FEE);
@@ -170,7 +172,7 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Burn Cycle Limit by owner', async function() {
+    it('should be possible to set Burn Cycle Limit by owner', async function() {
       const burnCycleLimit = utils.parseUnits('7000', baseUnit).toBigInt();
 
       expect(await dgvc.burnCycleLimit()).to.be.equal(burnCycle);
@@ -186,7 +188,7 @@ const { expect, assert } = require('chai');
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
-    it('should be set Rebase Delta by owner', async function() {
+    it('should be possible to set Rebase Delta by owner', async function() {
       const _rebaseDelta = utils.parseUnits('5000', baseUnit).toBigInt();
       
       expect(await dgvc.rebaseDelta()).to.be.equal(rebaseDelta);
