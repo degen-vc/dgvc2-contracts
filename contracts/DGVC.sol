@@ -61,7 +61,7 @@ contract DGVC is IDGVC, Context, Ownable {
     event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
     event Rebase(uint rebased);
-    event TokensRecovered(address indexed token, address indexed to, uint256 value);
+    event TokensRecovered(address token, address to, uint value);
 
     constructor(address _router) public {
         _reflectionOwned[_msgSender()] = _reflectionTotal;
@@ -397,9 +397,11 @@ contract DGVC is IDGVC, Context, Ownable {
     }
 
     function recoverTokens(IERC20 token, address destination) external onlyOwner {
-        require(destination != address(0), "Invalid destination");
-        uint256 balance = token.balanceOf(address(this));
-        token.safeTransfer(destination, balance);
-        emit TokensRecovered(address(token), destination, balance);
+        require(destination != address(0), "Zero address not allowed");
+        uint balance = token.balanceOf(address(this));
+        if (balance > 0) {
+            token.safeTransfer(destination, balance);
+            emit TokensRecovered(address(token), destination, balance);    
+        }  
     }
 }
