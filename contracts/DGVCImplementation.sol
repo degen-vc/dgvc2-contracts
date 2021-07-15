@@ -54,7 +54,7 @@ contract DGVCImplementation is IDGVC, Context, Ownable {
 
     uint private constant _MAX_TX_SIZE = 12000000 * _DECIMALFACTOR;
 
-    bool initiated;
+    bool public initiated;
 
     event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
