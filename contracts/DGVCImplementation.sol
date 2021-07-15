@@ -1,10 +1,10 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Ownable.sol";
 import "./interfaces/IDGVC.sol";
 
-contract DGVC is IDGVC, Context, Ownable {
+contract DGVCImplementation is IDGVC, Context, Ownable {
     mapping (address => uint) private _reflectionOwned;
     mapping (address => uint) private _actualOwned;
     mapping (address => mapping (address => uint)) private _allowances;
@@ -38,8 +38,8 @@ contract DGVC is IDGVC, Context, Ownable {
     uint private constant _DECIMALFACTOR = 10 ** uint(_DECIMALS);
     uint private constant _DIVIDER = 10000;
 
-    uint private _actualTotal = 12000000 * _DECIMALFACTOR;
-    uint private _reflectionTotal = (_MAX - (_MAX % _actualTotal));
+    uint private _actualTotal;
+    uint private _reflectionTotal;
 
     uint private _actualFeeTotal;
     uint private _actualBurnTotal;
@@ -54,14 +54,24 @@ contract DGVC is IDGVC, Context, Ownable {
 
     uint private constant _MAX_TX_SIZE = 12000000 * _DECIMALFACTOR;
 
+    bool initiated;
+
     event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
     event Rebase(uint rebased);
 
-    constructor(address _router) public {
+
+    function init(address _router) external returns (bool) {
+        require(!initiated, 'Already initiated');
+        _actualTotal = 12000000 * _DECIMALFACTOR;
+        _reflectionTotal = (_MAX - (_MAX % _actualTotal));
+        _setOwnership();
         _reflectionOwned[_msgSender()] = _reflectionTotal;
         router = _router;
         emit Transfer(address(0), _msgSender(), _actualTotal);
+
+        initiated = true;
+        return true;
     }
 
     function name() public pure returns (string memory) {
