@@ -2,9 +2,13 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IDGVC.sol";
 
+
 contract DGVC is IDGVC, Context, Ownable {
+    using SafeERC20 for IERC20;
+
     mapping (address => uint) private _reflectionOwned;
     mapping (address => uint) private _actualOwned;
     mapping (address => mapping (address => uint)) private _allowances;
@@ -57,6 +61,7 @@ contract DGVC is IDGVC, Context, Ownable {
     event BurnCycleLimitSet(uint cycleLimit);
     event RebaseDeltaSet(uint delta);
     event Rebase(uint rebased);
+    event TokensRecovered(address token, address to, uint value);
 
     constructor(address _router) public {
         _reflectionOwned[_msgSender()] = _reflectionTotal;
@@ -389,5 +394,14 @@ contract DGVC is IDGVC, Context, Ownable {
     function _rebase() internal {
         _actualTotal = _actualTotal + rebaseDelta;
         emit Rebase(rebaseDelta);
+    }
+
+    function recoverTokens(IERC20 token, address destination) external onlyOwner {
+        require(destination != address(0), "Zero address not allowed");
+        uint balance = token.balanceOf(address(this));
+        if (balance > 0) {
+            token.safeTransfer(destination, balance);
+            emit TokensRecovered(address(token), destination, balance);    
+        }  
     }
 }
