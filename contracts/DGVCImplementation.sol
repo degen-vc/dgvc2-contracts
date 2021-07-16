@@ -1,13 +1,12 @@
 pragma solidity 0.8.4;
 
-contract DGVCImplementation is IDGVC, Context, Ownable {
 import "./Ownable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IDGVC.sol";
 
 
-contract DGVC is IDGVC, Context, Ownable {
+contract DGVCImplementation is IDGVC, Context, Ownable {
     using SafeERC20 for IERC20;
 
     mapping (address => uint) private _reflectionOwned;
