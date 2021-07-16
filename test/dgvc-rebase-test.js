@@ -16,7 +16,8 @@ const { expect } = require('chai');
     const HUNDRED_PERCENT = 10000n;
 
     let accounts;
-    let dgvc;
+    let dgvcImplementation;
+    let dgvcProxy;
     let owner;
     let user;
     let feeReceiver;
@@ -29,9 +30,23 @@ const { expect } = require('chai');
       feeReceiver = accounts[2];
       userTwo = accounts[3];
 
-      const DGVC = await ethers.getContractFactory('DGVC');
-      dgvc = await DGVC.deploy(router);
-      await dgvc.deployed();
+      const DGVCImplementation = await ethers.getContractFactory('DGVCImplementation');
+      dgvcImplementation = await DGVCImplementation.deploy();
+      await dgvcImplementation.deployed();
+
+      //lock implementation
+      await dgvcImplementation.init(router);
+      await dgvcImplementation.renounceOwnership();
+
+      //setup proxy
+      const DGVCProxy = await ethers.getContractFactory('DGVCProxy');
+      dgvcProxy = await DGVCProxy.deploy();
+      await dgvcProxy.deployed();
+
+      await dgvcProxy.setImplementation(dgvcImplementation.address);
+
+      dgvcProxy = new ethers.Contract(dgvcProxy.address, DGVCImplementation.interface, owner);
+      await dgvcProxy.init(router);
 
       await ganache.snapshot();
     });
@@ -42,48 +57,48 @@ const { expect } = require('chai');
       burnCycle = utils.parseUnits('5000', baseUnit).toBigInt();
       rebaseDelta = utils.parseUnits('1000000', baseUnit).toBigInt();
 
-      await dgvc.setRebaseDelta(rebaseDelta);
-      await dgvc.setBurnCycle(burnCycle)
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+      await dgvcProxy.setBurnCycle(burnCycle)
 
       const commonFee = 200n;
       const commonBurnFee = 300n;
 
-      expect(await dgvc.commonBurnFee()).to.equal(0);
-      expect(await dgvc.commonFotFee()).to.equal(0);
-      await dgvc.setCommonFee(commonFee);
-      await dgvc.setBurnFee(commonBurnFee);
-      expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-      expect(await dgvc.commonFotFee()).to.equal(commonFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(0);
+      expect(await dgvcProxy.commonFotFee()).to.equal(0);
+      await dgvcProxy.setCommonFee(commonFee);
+      await dgvcProxy.setBurnFee(commonBurnFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
 
-      await dgvc.setFeeReceiver(feeReceiver.address);
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('10000', baseUnit).toBigInt();
 
       for (let i = 0; i < 16; i++) {
-        await dgvc.transfer(user.address, amount);
+        await dgvcProxy.transfer(user.address, amount);
 
-        expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-        expect(await dgvc.commonFotFee()).to.equal(commonFee);
+        expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+        expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
       }
 
 
       let transfersCount = 16n;
-      const totalSupplyBeforeRebase = await dgvc.totalSupply()
+      const totalSupplyBeforeRebase = await dgvcProxy.totalSupply()
       const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
 
       const ownerBalanceExpectedBeforeRebase = totalSupply - amount * transfersCount;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
 
       const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
 
       const feeReceiverBalanceExpectedBeforeRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
 
 
-      await dgvc.transfer(user.address, amount);
+      await dgvcProxy.transfer(user.address, amount);
 
-      const supplyAfterRebase = await dgvc.totalSupply();
+      const supplyAfterRebase = await dgvcProxy.totalSupply();
 
       const rebaseAmount = utils.parseUnits('1000000', baseUnit).toBigInt();
 
@@ -91,71 +106,71 @@ const { expect } = require('chai');
       const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
 
-      const balanceOwner = await dgvc.balanceOf(owner.address);
-      const balanceUser = await dgvc.balanceOf(user.address);
-      const balanceFeeReceiver = await dgvc.balanceOf(feeReceiver.address);
+      const balanceOwner = await dgvcProxy.balanceOf(owner.address);
+      const balanceUser = await dgvcProxy.balanceOf(user.address);
+      const balanceFeeReceiver = await dgvcProxy.balanceOf(feeReceiver.address);
       expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpectedAfterRebase - 2n));
 
       const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
 
       const feeReceiverBalanceExpectedAfterRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
       const feeReceiverRebaseShare = feeReceiverBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
 
       const ownerBalanceExpectedAfterRebase = totalSupply - amount * transfersCount;
       const ownerRebaseShare = ownerBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
 
       const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
     });
 
     it('rebase delta set, burn limit set (rebase amount is LESS than burned amount). 2 Users make transfers and reach rebase limit. check all balances, total supply after rebase.', async () => {
       burnCycle = utils.parseUnits('5000', baseUnit).toBigInt();
       rebaseDelta = utils.parseUnits('200', baseUnit).toBigInt();
 
-      await dgvc.setRebaseDelta(rebaseDelta);
-      await dgvc.setBurnCycle(burnCycle)
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+      await dgvcProxy.setBurnCycle(burnCycle)
 
       const commonFee = 200n;
       const commonBurnFee = 300n;
 
-      expect(await dgvc.commonBurnFee()).to.equal(0);
-      expect(await dgvc.commonFotFee()).to.equal(0);
-      await dgvc.setCommonFee(commonFee);
-      await dgvc.setBurnFee(commonBurnFee);
-      expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-      expect(await dgvc.commonFotFee()).to.equal(commonFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(0);
+      expect(await dgvcProxy.commonFotFee()).to.equal(0);
+      await dgvcProxy.setCommonFee(commonFee);
+      await dgvcProxy.setBurnFee(commonBurnFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
 
-      await dgvc.setFeeReceiver(feeReceiver.address);
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('10000', baseUnit).toBigInt();
 
       for (let i = 0; i < 16; i++) {
-        await dgvc.transfer(user.address, amount);
+        await dgvcProxy.transfer(user.address, amount);
 
-        expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-        expect(await dgvc.commonFotFee()).to.equal(commonFee);
+        expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+        expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
       }
 
       let transfersCount = 16n;
-      const totalSupplyBeforeRebase = await dgvc.totalSupply();
+      const totalSupplyBeforeRebase = await dgvcProxy.totalSupply();
       const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
 
       const ownerBalanceExpectedBeforeRebase = totalSupply - amount * transfersCount;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
 
       const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
 
       const feeReceiverBalanceExpectedBeforeRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
 
 
-      await dgvc.transfer(user.address, amount);
+      await dgvcProxy.transfer(user.address, amount);
 
-      const supplyAfterRebase = await dgvc.totalSupply();
+      const supplyAfterRebase = await dgvcProxy.totalSupply();
       const rebaseAmount = utils.parseUnits('200', baseUnit).toBigInt();
 
       transfersCount = 17n;
@@ -163,71 +178,71 @@ const { expect } = require('chai');
 
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
 
-      const balanceOwner = await dgvc.balanceOf(owner.address);
-      const balanceUser = await dgvc.balanceOf(user.address);
-      const balanceFeeReceiver = await dgvc.balanceOf(feeReceiver.address);
+      const balanceOwner = await dgvcProxy.balanceOf(owner.address);
+      const balanceUser = await dgvcProxy.balanceOf(user.address);
+      const balanceFeeReceiver = await dgvcProxy.balanceOf(feeReceiver.address);
       expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpectedAfterRebase - 1n));
 
       const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
 
       const feeReceiverBalanceExpectedAfterRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
       const feeReceiverRebaseShare = feeReceiverBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
 
       const ownerBalanceExpectedAfterRebase = totalSupply - amount * transfersCount;
       const ownerRebaseShare = ownerBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
 
       const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
     });
 
     it('rebase delta is 0, burn limit is 0', async () => {
       burnCycle = utils.parseUnits('0', baseUnit).toBigInt();
       rebaseDelta = utils.parseUnits('0', baseUnit).toBigInt();
 
-      await dgvc.setRebaseDelta(rebaseDelta);
-      await dgvc.setBurnCycle(burnCycle)
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+      await dgvcProxy.setBurnCycle(burnCycle)
 
       const commonFee = 200n;
       const commonBurnFee = 300n;
 
-      expect(await dgvc.commonBurnFee()).to.equal(0);
-      expect(await dgvc.commonFotFee()).to.equal(0);
-      await dgvc.setCommonFee(commonFee);
-      await dgvc.setBurnFee(commonBurnFee);
-      expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-      expect(await dgvc.commonFotFee()).to.equal(commonFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(0);
+      expect(await dgvcProxy.commonFotFee()).to.equal(0);
+      await dgvcProxy.setCommonFee(commonFee);
+      await dgvcProxy.setBurnFee(commonBurnFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
 
-      await dgvc.setFeeReceiver(feeReceiver.address);
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('10000', baseUnit).toBigInt();
 
       for (let i = 0; i < 16; i++) {
-        await dgvc.transfer(user.address, amount);
+        await dgvcProxy.transfer(user.address, amount);
 
-        expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-        expect(await dgvc.commonFotFee()).to.equal(commonFee);
+        expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+        expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
       }
 
       let transfersCount = 16n;
-      const totalSupplyBeforeRebase = await dgvc.totalSupply();
+      const totalSupplyBeforeRebase = await dgvcProxy.totalSupply();
       const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
 
       const ownerBalanceExpectedBeforeRebase = totalSupply - amount * transfersCount;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
 
       const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
 
       const feeReceiverBalanceExpectedBeforeRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
 
 
-      await dgvc.transfer(user.address, amount);
+      await dgvcProxy.transfer(user.address, amount);
 
-      const supplyAfterRebase = await dgvc.totalSupply();
+      const supplyAfterRebase = await dgvcProxy.totalSupply();
       const rebaseAmount = utils.parseUnits('0', baseUnit).toBigInt();
 
       transfersCount = 17n;
@@ -235,66 +250,66 @@ const { expect } = require('chai');
 
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
 
-      const balanceOwner = await dgvc.balanceOf(owner.address);
-      const balanceUser = await dgvc.balanceOf(user.address);
-      const balanceFeeReceiver = await dgvc.balanceOf(feeReceiver.address);
+      const balanceOwner = await dgvcProxy.balanceOf(owner.address);
+      const balanceUser = await dgvcProxy.balanceOf(user.address);
+      const balanceFeeReceiver = await dgvcProxy.balanceOf(feeReceiver.address);
       expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpectedAfterRebase));
 
       const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
 
       const feeReceiverBalanceExpectedAfterRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
       const feeReceiverRebaseShare = feeReceiverBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
 
       const ownerBalanceExpectedAfterRebase = totalSupply - amount * transfersCount;
       const ownerRebaseShare = ownerBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
 
       const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
     });
 
     it('small burn cycle, rebase should happen', async () => {
       burnCycle = utils.parseUnits('3', baseUnit).toBigInt();;
       rebaseDelta = utils.parseUnits('200', baseUnit).toBigInt();
 
-      await dgvc.setRebaseDelta(rebaseDelta);
-      await dgvc.setBurnCycle(burnCycle)
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+      await dgvcProxy.setBurnCycle(burnCycle)
 
       const commonFee = 200n;
       const commonBurnFee = 300n;
 
-      expect(await dgvc.commonBurnFee()).to.equal(0);
-      expect(await dgvc.commonFotFee()).to.equal(0);
-      await dgvc.setCommonFee(commonFee);
-      await dgvc.setBurnFee(commonBurnFee);
-      expect(await dgvc.commonBurnFee()).to.equal(commonBurnFee);
-      expect(await dgvc.commonFotFee()).to.equal(commonFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(0);
+      expect(await dgvcProxy.commonFotFee()).to.equal(0);
+      await dgvcProxy.setCommonFee(commonFee);
+      await dgvcProxy.setBurnFee(commonBurnFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
 
-      await dgvc.setFeeReceiver(feeReceiver.address);
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
       let amount = utils.parseUnits('50', baseUnit).toBigInt();
       
-      await dgvc.transfer(user.address, amount);
+      await dgvcProxy.transfer(user.address, amount);
 
       let transfersCount = 1n;
-      const totalSupplyBeforeRebase = await dgvc.totalSupply();
+      const totalSupplyBeforeRebase = await dgvcProxy.totalSupply();
       const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT);
       expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
 
       const ownerBalanceExpectedBeforeRebase = totalSupply - amount * transfersCount;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedBeforeRebase));
 
       const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
 
       const feeReceiverBalanceExpectedBeforeRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
 
 
-      await dgvc.transfer(user.address, amount);
+      await dgvcProxy.transfer(user.address, amount);
 
-      const supplyAfterRebase = await dgvc.totalSupply();
+      const supplyAfterRebase = await dgvcProxy.totalSupply();
       const rebaseAmount = utils.parseUnits('200', baseUnit).toBigInt();
 
       transfersCount = 2n;
@@ -302,23 +317,23 @@ const { expect } = require('chai');
 
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
 
-      const balanceOwner = await dgvc.balanceOf(owner.address);
-      const balanceUser = await dgvc.balanceOf(user.address);
-      const balanceFeeReceiver = await dgvc.balanceOf(feeReceiver.address);
+      const balanceOwner = await dgvcProxy.balanceOf(owner.address);
+      const balanceUser = await dgvcProxy.balanceOf(user.address);
+      const balanceFeeReceiver = await dgvcProxy.balanceOf(feeReceiver.address);
       expect(BigInttoBN(BNtoBigInt(balanceOwner) + BNtoBigInt(balanceUser) + BNtoBigInt(balanceFeeReceiver))).to.equal(BigInttoBN(totalSupplyExpectedAfterRebase - 2n));
 
       const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
 
       const feeReceiverBalanceExpectedAfterRebase = amount * commonFee * transfersCount / HUNDRED_PERCENT;
       const feeReceiverRebaseShare = feeReceiverBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedAfterRebase + feeReceiverRebaseShare));
 
       const ownerBalanceExpectedAfterRebase = totalSupply - amount * transfersCount;
       const ownerRebaseShare = ownerBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
+      expect(await dgvcProxy.balanceOf(owner.address)).to.equal(BigInttoBN(ownerBalanceExpectedAfterRebase + ownerRebaseShare));
 
       const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
-      expect(await dgvc.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
     });
   });

@@ -23,7 +23,8 @@ describe('FeeDistributor', function() {
   let user;
   let feeReceiver;
   let userTwo;
-  let dgvc;
+  let dgvcProxy;
+  let dgvcImplementation;
   let vaultFake;
 
   before('setup others', async function() {
@@ -37,8 +38,23 @@ describe('FeeDistributor', function() {
     const FeeDistributor = await ethers.getContractFactory('FeeDistributor');
     feeDistributor = await FeeDistributor.deploy();
 
-    const DGVC = await ethers.getContractFactory('DGVC');
-    dgvc = await DGVC.deploy(ROUTER);
+    DGVCImplementation = await ethers.getContractFactory('DGVCImplementation');
+    dgvcImplementation = await DGVCImplementation.deploy();
+    await dgvcImplementation.deployed();
+
+    //lock implementation
+    await dgvcImplementation.init(ROUTER);
+    await dgvcImplementation.renounceOwnership();
+
+    //setup proxy
+    const DGVCProxy = await ethers.getContractFactory('DGVCProxy');
+    dgvcProxy = await DGVCProxy.deploy();
+    await dgvcProxy.deployed();
+
+    await dgvcProxy.setImplementation(dgvcImplementation.address);
+
+    dgvcProxy = new ethers.Contract(dgvcProxy.address, DGVCImplementation.interface, owner);
+    await dgvcProxy.init(ROUTER);
 
     await ganache.snapshot();
   });
@@ -65,7 +81,7 @@ describe('FeeDistributor', function() {
     expect(recipientsBefore.burnPercentage).to.equal(0);
 
     await feeDistributor.seed(
-      dgvc.address, 
+      dgvcProxy.address, 
       vaultFake.address, 
       feeReceiver.address,
       liquidVaultShare,
@@ -74,7 +90,7 @@ describe('FeeDistributor', function() {
 
     const recipientsAfter = await feeDistributor.recipients();
 
-    expect(await feeDistributor.dgvc()).to.equal(dgvc.address);
+    expect(await feeDistributor.dgvc()).to.equal(dgvcProxy.address);
     expect(await feeDistributor.initialized()).to.equal(true);
     expect(recipientsAfter.liquidVault).to.equal(vaultFake.address);
     expect(recipientsAfter.secondaryAddress).to.equal(feeReceiver.address);
@@ -91,7 +107,7 @@ describe('FeeDistributor', function() {
     const burnPercentageNew = 5;
 
     await feeDistributor.seed(
-      dgvc.address, 
+      dgvcProxy.address, 
       vaultFake.address, 
       feeReceiver.address,
       liquidVaultShare,
@@ -100,7 +116,7 @@ describe('FeeDistributor', function() {
 
     const recipientsBefore = await feeDistributor.recipients();
 
-    expect(await feeDistributor.dgvc()).to.equal(dgvc.address);
+    expect(await feeDistributor.dgvc()).to.equal(dgvcProxy.address);
     expect(await feeDistributor.initialized()).to.equal(true);
     expect(recipientsBefore.liquidVault).to.equal(vaultFake.address);
     expect(recipientsBefore.secondaryAddress).to.equal(feeReceiver.address);
@@ -127,7 +143,7 @@ describe('FeeDistributor', function() {
 
   it('should revert seed() if caller is not the owner', async function() {
     await expect(feeDistributor.connect(user).seed(
-      dgvc.address, 
+      dgvcProxy.address, 
       vaultFake.address, 
       user.address, 
       liquidVaultShare, 
@@ -138,23 +154,23 @@ describe('FeeDistributor', function() {
   it('should distribute fees according to seeded parameters', async function() {
     const distributeAmount = utils.parseUnits('10000', baseUnit).toBigInt();
     await feeDistributor.seed(
-      dgvc.address, 
+      dgvcProxy.address, 
       vaultFake.address, 
       feeReceiver.address,
       liquidVaultShare,
       burnPercentage
     );
 
-    await dgvc.setFeeReceiver(feeDistributor.address);
-    await dgvc.transfer(feeDistributor.address, distributeAmount);
-    expect(await dgvc.balanceOf(feeDistributor.address)).to.equal(distributeAmount);
+    await dgvcProxy.setFeeReceiver(feeDistributor.address);
+    await dgvcProxy.transfer(feeDistributor.address, distributeAmount);
+    expect(await dgvcProxy.balanceOf(feeDistributor.address)).to.equal(distributeAmount);
 
     await feeDistributor.distributeFees();
     const expectedVaultBalance = liquidVaultShare * distributeAmount / HUNDRED_PERCENT;
     const expectedBurnPercentage = burnPercentage * distributeAmount / HUNDRED_PERCENT;
     const expectedSecondaryAddress = distributeAmount - expectedBurnPercentage - expectedVaultBalance;
 
-    expect(await dgvc.balanceOf(vaultFake.address)).to.equal(expectedVaultBalance);
-    expect(await dgvc.balanceOf(feeReceiver.address)).to.equal(expectedSecondaryAddress);
+    expect(await dgvcProxy.balanceOf(vaultFake.address)).to.equal(expectedVaultBalance);
+    expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(expectedSecondaryAddress);
   });
 });

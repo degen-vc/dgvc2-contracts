@@ -13,7 +13,8 @@ const { expect, assert } = require('chai');
     const amount = utils.parseUnits('100', baseUnit).toBigInt();
 
     let accounts;
-    let dgvc;
+    let dgvcImplementation;
+    let dgvcProxy;
     let dgvc1;
     let owner;
     let user;
@@ -26,10 +27,24 @@ const { expect, assert } = require('chai');
       user = accounts[1];
       feeReceiver = accounts[2];
       userTwo = accounts[3];
-      
-      const DGVC = await ethers.getContractFactory('DGVC');
-      dgvc = await DGVC.deploy(router);
-      await dgvc.deployed();
+
+      const DGVCImplementation = await ethers.getContractFactory('DGVCImplementation');
+      dgvcImplementation = await DGVCImplementation.deploy();
+      await dgvcImplementation.deployed();
+
+      //lock implementation
+      await dgvcImplementation.init(router);
+      await dgvcImplementation.renounceOwnership();
+
+      //setup proxy
+      const DGVCProxy = await ethers.getContractFactory('DGVCProxy');
+      dgvcProxy = await DGVCProxy.deploy();
+      await dgvcProxy.deployed();
+
+      await dgvcProxy.setImplementation(dgvcImplementation.address);
+
+      dgvcProxy = new ethers.Contract(dgvcProxy.address, DGVCImplementation.interface, owner);
+      await dgvcProxy.init(router);
 
       const DGVC1 = await ethers.getContractFactory('DegenVC1');
       dgvc1 = await DGVC1.deploy();
@@ -41,22 +56,22 @@ const { expect, assert } = require('chai');
 
     it('should revert recoverTokens() if caller is not the owner', async function() {
       await expect(
-        dgvc.connect(user).recoverTokens(dgvc1.address, userTwo.address)
+        dgvcProxy.connect(user).recoverTokens(dgvc1.address, userTwo.address)
       ).to.be.revertedWith('Ownable: caller is not the owner');
     });
 
     it('should revert recoverTokens() in case of zero destination address', async function() {
         await expect(
-          dgvc.recoverTokens(dgvc1.address , ZERO_ADDRESS)
+          dgvcProxy.recoverTokens(dgvc1.address , ZERO_ADDRESS)
         ).to.be.revertedWith('Zero address not allowed');
     });
 
     it('should be possible to recover tokens by owner', async function() {
         expect(await dgvc1.balanceOf(user.address)).to.be.equal(BigInttoBN(0));
-        
-        await dgvc1.transfer(dgvc.address, amount);
 
-        dgvc.recoverTokens(dgvc1.address, user.address);
+        await dgvc1.transfer(dgvcProxy.address, amount);
+
+        dgvcProxy.recoverTokens(dgvc1.address, user.address);
 
         expect(await dgvc1.balanceOf(user.address)).to.be.equal(BigInttoBN(amount));
     });
@@ -64,18 +79,18 @@ const { expect, assert } = require('chai');
     it('should not be possible to recover tokens in case of 0 balance', async function() {
         expect(await dgvc1.balanceOf(user.address)).to.be.equal(BigInttoBN(0));
 
-        dgvc.recoverTokens(dgvc1.address, user.address);
+        dgvcProxy.recoverTokens(dgvc1.address, user.address);
 
         expect(await dgvc1.balanceOf(user.address)).to.be.equal(BigInttoBN(0));
     });
 
     it('should be possible to recover DGVC tokens', async function() {
-        expect(await dgvc.balanceOf(user.address)).to.be.equal(BigInttoBN(0));
-        
-        await dgvc.transfer(dgvc.address, amount);
+        expect(await dgvcProxy.balanceOf(user.address)).to.be.equal(BigInttoBN(0));
 
-        dgvc.recoverTokens(dgvc.address, user.address);
+        await dgvcProxy.transfer(dgvcProxy.address, amount);
 
-        expect(await dgvc.balanceOf(user.address)).to.be.equal(BigInttoBN(amount));
+        dgvcProxy.recoverTokens(dgvcProxy.address, user.address);
+
+        expect(await dgvcProxy.balanceOf(user.address)).to.be.equal(BigInttoBN(amount));
     });
 });
