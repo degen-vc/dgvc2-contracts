@@ -3,7 +3,7 @@ const assert = require('assert');
 const { BigNumber, utils } = require('ethers');
 const { expect } = require('chai');
 
-  describe('DGVC', function() {
+  describe('DGVC Rebase', function() {
     const BNtoBigInt = (input) => BigInt(input.toString());
     const BigInttoBN = (input) => BigNumber.from(input.toString());
 
@@ -335,5 +335,167 @@ const { expect } = require('chai');
       const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
       const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
       expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+    });
+
+    // Rebase delta set, burn limit set (rebase amount is LESS than burned amount). 
+    // 1st User makes transfers, 2nd User makes trades and reaches rebase limit. 
+    // check all balances, total supply after rebase.
+
+    it('rebase delta set, burn limit set (rebase amount is LESS than burned amount). 1st User makes transfers, 2nd User makes trades and reaches rebase limit. check all balances, total supply after rebase.', async () => {
+      // precondition add liquidity
+      const UniswapV2Pair = require("@uniswap/v2-core/build/UniswapV2Pair.json");
+      const deployUniswap = require('./helpers/deployUniswap');
+
+      let weth;
+      let uniswapFactory;
+      let uniswapRouter;
+      let uniswapPair;
+      let pairAddress;
+
+      const contracts = await deployUniswap(accounts);
+
+      weth = contracts.weth;
+      uniswapFactory = contracts.uniswapFactory;
+      uniswapRouter = contracts.uniswapRouter;
+
+      const DGVCImplementation = await ethers.getContractFactory('DGVCImplementation');
+      dgvcImplementation = await DGVCImplementation.deploy();
+      await dgvcImplementation.deployed();
+
+      //lock implementation
+      await dgvcImplementation.init(uniswapRouter.address);
+      await dgvcImplementation.renounceOwnership();
+
+      //setup proxy
+      const DGVCProxy = await ethers.getContractFactory('DGVCProxy');
+      dgvcProxy = await DGVCProxy.deploy();
+      await dgvcProxy.deployed();
+
+      await dgvcProxy.setImplementation(dgvcImplementation.address);
+
+      dgvcProxy = new ethers.Contract(dgvcProxy.address, DGVCImplementation.interface, owner);
+      await dgvcProxy.init(uniswapRouter.address);
+
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+      await dgvcProxy.setBurnCycle(burnCycle);
+
+      await uniswapFactory.createPair(weth.address, dgvcProxy.address);
+      pairAddress = await uniswapFactory.getPair(weth.address, dgvcProxy.address);
+      uniswapPair = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress);
+
+      const liquidityDgvcAmount = utils.parseUnits('200000', baseUnit);
+      const liquidityETHAmount = utils.parseEther('200');
+
+      await dgvcProxy.approve(uniswapRouter.address, liquidityDgvcAmount);
+
+      await expect(uniswapRouter.addLiquidityETH(
+        dgvcProxy.address,
+        liquidityDgvcAmount,
+        0,
+        0,
+        owner.address,
+        new Date().getTime() + 3000,
+        { value: liquidityETHAmount }
+      )).to.emit(uniswapPair, 'Mint');
+
+
+      // test
+      const DEX_SELL_FEE = 600n;
+      const DEX_BUY_FEE = 400n;
+      const DEX_BURN_FEE = 250n;
+
+      burnCycle = utils.parseUnits('5000', baseUnit).toBigInt();
+      rebaseDelta = utils.parseUnits('200', baseUnit).toBigInt();
+
+      await dgvcProxy.setBurnCycle(burnCycle);
+      await dgvcProxy.setRebaseDelta(rebaseDelta);
+
+      const commonFee = 200n;
+      const commonBurnFee = 300n;
+      
+      expect(await dgvcProxy.commonBurnFee()).to.equal(0);
+      expect(await dgvcProxy.commonFotFee()).to.equal(0);
+      await dgvcProxy.setCommonFee(commonFee);
+      await dgvcProxy.setBurnFee(commonBurnFee);
+      expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+      expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
+
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
+      let amount = utils.parseUnits('10000', baseUnit).toBigInt(); // for transfer
+      let amount2 = utils.parseUnits('1000', baseUnit).toBigInt(); // for dex
+
+      await dgvcProxy.setDexFee(uniswapPair.address, DEX_BUY_FEE, DEX_SELL_FEE, DEX_BURN_FEE);
+
+      const { buy, sell, burn } = await dgvcProxy.dexFOT(uniswapPair.address);
+
+      expect(buy).to.equal(BigInttoBN(DEX_BUY_FEE));
+      expect(sell).to.equal(BigInttoBN(DEX_SELL_FEE));
+      expect(burn).to.equal(BigInttoBN(DEX_BURN_FEE));
+
+      await dgvcProxy.setFeeReceiver(feeReceiver.address);
+
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(0);
+      expect(await dgvcProxy.actualBurnCycle()).to.equal(0);
+      expect(await dgvcProxy.totalBurn()).to.equal(0);
+
+      for (let i = 0; i < 15; i++) {
+
+        await dgvcProxy.transfer(user.address, amount);
+
+        await uniswapRouter.connect(userTwo).swapETHForExactTokens(
+          amount2,
+          [weth.address, dgvcProxy.address],
+          userTwo.address,
+          new Date().getTime() + 3000,
+          { value: utils.parseEther('2') }
+        );
+
+        expect(await dgvcProxy.commonBurnFee()).to.equal(commonBurnFee);
+        expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
+      }
+
+      let transfersCount = 15n;
+      const totalSupplyBeforeRebase = await dgvcProxy.totalSupply();
+      const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT)  - (amount2 * DEX_BURN_FEE * transfersCount / HUNDRED_PERCENT);
+      expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
+
+      const userBalanceExpectedBeforeRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedBeforeRebase));
+
+      const userTwoBalanceExpectedBeforeRebase = (amount2 * transfersCount) - (amount2 * ( DEX_BUY_FEE + DEX_BURN_FEE ) * transfersCount / HUNDRED_PERCENT);
+      expect(await dgvcProxy.balanceOf(userTwo.address)).to.equal(BigInttoBN(userTwoBalanceExpectedBeforeRebase));
+
+      const feeReceiverBalanceExpectedBeforeRebase = (amount * (commonFee) * transfersCount / HUNDRED_PERCENT) + (amount2 * (DEX_BUY_FEE) * transfersCount / HUNDRED_PERCENT);
+      expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(BigInttoBN(feeReceiverBalanceExpectedBeforeRebase));
+
+      await dgvcProxy.transfer(user.address, amount);
+
+      await uniswapRouter.connect(userTwo).swapETHForExactTokens(
+        amount2,
+        [weth.address, dgvcProxy.address],
+        userTwo.address,
+        new Date().getTime() + 3000,
+        { value: utils.parseEther('2') }
+      );
+
+      const supplyAfterRebase = await dgvcProxy.totalSupply();
+      const rebaseAmount = utils.parseUnits('200', baseUnit).toBigInt();
+
+      transfersCount = 16n;
+      
+      const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT)  - (amount2 * DEX_BURN_FEE * transfersCount / HUNDRED_PERCENT);
+
+      expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
+
+      const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - amount * commonBurnFee / HUNDRED_PERCENT;
+      const supplyFromRebase2 = BNtoBigInt(totalSupplyBeforeRebase) - amount2 * DEX_BURN_FEE / HUNDRED_PERCENT;
+
+      const userBalanceExpectedAfterRebase = (amount * transfersCount) - (amount * (commonBurnFee + commonFee) * transfersCount / HUNDRED_PERCENT);
+      const userRebaseShare = userBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase;
+      expect(await dgvcProxy.balanceOf(user.address)).to.equal(BigInttoBN(userBalanceExpectedAfterRebase + userRebaseShare));
+
+      const userTwoBalanceExpectedAfterRebase = (amount2 * transfersCount) - (amount2 * (DEX_BUY_FEE + DEX_BURN_FEE) * transfersCount / HUNDRED_PERCENT);
+      const userTwoRebaseShare = userTwoBalanceExpectedAfterRebase * rebaseDelta / supplyFromRebase2;
+      expect(await dgvcProxy.balanceOf(userTwo.address)).to.equal(BigInttoBN(userTwoBalanceExpectedAfterRebase + userTwoRebaseShare));
     });
   });
