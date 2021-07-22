@@ -487,6 +487,12 @@ describe('DGVC Custom Transfers', function() {
 
     await dgvcProxy.setDexFee(uniswapPair2.address, DEX2_BUY_FEE, DEX2_SELL_FEE, DEX2_BURN_FEE);
 
+    const { buy: buy2, sell: sell2, burn: burn2 } = await dgvcProxy.dexFOT(uniswapPair2.address);
+
+    expect(buy2).to.equal(BigInttoBN(DEX2_BUY_FEE));
+    expect(sell2).to.equal(BigInttoBN(DEX2_SELL_FEE));
+    expect(burn2).to.equal(BigInttoBN(DEX2_BURN_FEE));
+
     await uniswapRouter2.connect(user).swapETHForExactTokens(
       amount2,
       [weth2.address, dgvcProxy.address],
