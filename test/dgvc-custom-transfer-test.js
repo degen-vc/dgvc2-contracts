@@ -396,23 +396,13 @@ describe('DGVC Custom Transfers', function() {
 
   it('should be possible to buy tokens in two different DEXes, with DEXes fees initiated, and without custom fees', async function() {
     // setup dex2
-    let weth2;
-    let uniswapFactory2;
-    let uniswapRouter2;
-    let uniswapPair2;
-    let pairAddress2;
-
     accounts = await ethers.getSigners();
 
-    const contracts2 = await deployUniswap(accounts);
-
-    weth2 = contracts2.weth;
-    uniswapFactory2 = contracts2.uniswapFactory;
-    uniswapRouter2 = contracts2.uniswapRouter;
+    const { weth: weth2, uniswapFactory: uniswapFactory2, uniswapRouter: uniswapRouter2 } = await deployUniswap(accounts);
 
     await uniswapFactory2.createPair(weth2.address, dgvcProxy.address);
-    pairAddress2 = await uniswapFactory2.getPair(weth2.address, dgvcProxy.address);
-    uniswapPair2 = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress2);
+    const pairAddress2 = await uniswapFactory2.getPair(weth2.address, dgvcProxy.address);
+    const uniswapPair2 = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress2);
 
     const liquidityDgvcAmount2 = utils.parseUnits('10000', baseUnit);
     const liquidityETHAmount2 = utils.parseEther('10');

@@ -342,20 +342,10 @@ const { expect } = require('chai');
       const UniswapV2Pair = require("@uniswap/v2-core/build/UniswapV2Pair.json");
       const deployUniswap = require('./helpers/deployUniswap');
 
-      let weth;
-      let uniswapFactory;
-      let uniswapRouter;
-      let uniswapPair;
-      let pairAddress;
-
-      const contracts = await deployUniswap(accounts);
-
-      weth = contracts.weth;
-      uniswapFactory = contracts.uniswapFactory;
-      uniswapRouter = contracts.uniswapRouter;
+      const { weth, uniswapFactory, uniswapRouter } = await deployUniswap(accounts);
 
       const DGVCImplementation = await ethers.getContractFactory('DGVCImplementation');
-      dgvcImplementation = await DGVCImplementation.deploy();
+      const dgvcImplementation = await DGVCImplementation.deploy();
       await dgvcImplementation.deployed();
 
       //lock implementation
@@ -364,7 +354,7 @@ const { expect } = require('chai');
 
       //setup proxy
       const DGVCProxy = await ethers.getContractFactory('DGVCProxy');
-      dgvcProxy = await DGVCProxy.deploy();
+      let dgvcProxy = await DGVCProxy.deploy();
       await dgvcProxy.deployed();
 
       await dgvcProxy.setImplementation(dgvcImplementation.address);
@@ -376,8 +366,8 @@ const { expect } = require('chai');
       await dgvcProxy.setBurnCycle(burnCycle);
 
       await uniswapFactory.createPair(weth.address, dgvcProxy.address);
-      pairAddress = await uniswapFactory.getPair(weth.address, dgvcProxy.address);
-      uniswapPair = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress);
+      const pairAddress = await uniswapFactory.getPair(weth.address, dgvcProxy.address);
+      const uniswapPair = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress);
 
       const liquidityDgvcAmount = utils.parseUnits('200000', baseUnit);
       const liquidityETHAmount = utils.parseEther('200');
@@ -451,7 +441,7 @@ const { expect } = require('chai');
         expect(await dgvcProxy.commonFotFee()).to.equal(commonFee);
       }
 
-      let transfersCount = 15n;
+      const transfersCount = 15n;
       const totalSupplyBeforeRebase = await dgvcProxy.totalSupply();
       const totalSupplyExpectedBeforeRebase = totalSupply - (amount * commonBurnFee * transfersCount / HUNDRED_PERCENT)  - (amount2 * DEX_BURN_FEE * transfersCount / HUNDRED_PERCENT);
       expect(totalSupplyBeforeRebase).to.equal(totalSupplyExpectedBeforeRebase);
@@ -473,7 +463,7 @@ const { expect } = require('chai');
 
       const supplyFromRebase = BNtoBigInt(totalSupplyBeforeRebase) - (amount * commonBurnFee  / HUNDRED_PERCENT);
     
-      transfersCountAfterRebase = 16n;
+      const transfersCountAfterRebase = 16n;
 
       const totalSupplyExpectedAfterRebase = totalSupply + rebaseAmount - (amount * commonBurnFee * transfersCountAfterRebase / HUNDRED_PERCENT) - (amount2 * DEX_BURN_FEE * transfersCount / HUNDRED_PERCENT);
       expect(supplyAfterRebase).to.equal(totalSupplyExpectedAfterRebase);
