@@ -77,11 +77,7 @@ describe('DGVC Custom Transfers', function() {
     const liquidityDgvcAmount = utils.parseUnits('10000', baseUnit);
     const liquidityETHAmount = utils.parseEther('10');
 
-
-
     await dgvcProxy.approve(uniswapRouter.address, liquidityDgvcAmount);
-
-
 
     await expect(uniswapRouter.addLiquidityETH(
       dgvcProxy.address,
@@ -391,5 +387,113 @@ describe('DGVC Custom Transfers', function() {
     expect(await dgvcProxy.balanceOf(userTwo.address)).to.equal(0);
     expect(await dgvcProxy.balanceOf(feeReceiver.address), amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT);
     expect(await dgvcProxy.totalSupply()).to.equal(totalSupply - (amount * CUSTOM_BURN_FEE / HUNDRED_PERCENT));    
+  });
+
+  // User doesn’t have custom fee, custom burn. DEX fees initiated for 2 different dexes(pairs sushi/uni). 
+  // User buys 1000 tokens on dex1, Check burn cycle increased, total supply decreased. 
+  // Dex1 fees applied for buy operation, User buys 1000 tokens on dex2, 
+  // Check burn cycle increased, total supply decreased. Dex2 fees applied for buy operation.
+
+  it('should be possible to buy tokens in two different DEXes, with DEXes fees initiated, and without custom fees', async function() {
+    // setup dex2
+    accounts = await ethers.getSigners();
+
+    const { weth: weth2, uniswapFactory: uniswapFactory2, uniswapRouter: uniswapRouter2 } = await deployUniswap(accounts);
+
+    await uniswapFactory2.createPair(weth2.address, dgvcProxy.address);
+    const pairAddress2 = await uniswapFactory2.getPair(weth2.address, dgvcProxy.address);
+    const uniswapPair2 = await ethers.getContractAt(UniswapV2Pair.abi, pairAddress2);
+
+    const liquidityDgvcAmount2 = utils.parseUnits('10000', baseUnit);
+    const liquidityETHAmount2 = utils.parseEther('10');
+
+    await dgvcProxy.approve(uniswapRouter2.address, liquidityDgvcAmount2);
+
+    await expect(uniswapRouter2.addLiquidityETH(
+      dgvcProxy.address,
+      liquidityDgvcAmount2,
+      0,
+      0,
+      owner.address,
+      new Date().getTime() + 3000,
+      { value: liquidityETHAmount2 }
+    )).to.emit(uniswapPair2, 'Mint');
+    
+
+    // test
+    const DEX_BUY_FEE = 400n;
+    const DEX_SELL_FEE = 600n;
+    const DEX_BURN_FEE = 150n;
+
+    const amount = utils.parseUnits('1000', baseUnit).toBigInt();
+
+    expect(await dgvcProxy.balanceOf(user.address)).to.equal(0);
+
+    await dgvcProxy.setDexFee(uniswapPair.address, DEX_BUY_FEE, DEX_SELL_FEE, DEX_BURN_FEE);
+
+    const { buy, sell, burn } = await dgvcProxy.dexFOT(uniswapPair.address);
+
+    expect(buy).to.equal(BigInttoBN(DEX_BUY_FEE));
+    expect(sell).to.equal(BigInttoBN(DEX_SELL_FEE));
+    expect(burn).to.equal(BigInttoBN(DEX_BURN_FEE));
+
+    await dgvcProxy.setFeeReceiver(feeReceiver.address);
+
+    expect(await dgvcProxy.balanceOf(user.address)).to.equal(0);
+    expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(0);
+    expect(await dgvcProxy.actualBurnCycle()).to.equal(0);
+    expect(await dgvcProxy.totalBurn()).to.equal(0);   
+
+    const balanceBefore = await ethers.provider.getBalance(user.address);
+    const balanceOfFeeReceiverBefore = await dgvcProxy.balanceOf(feeReceiver.address);
+    const actualBurnCycleBefore = await dgvcProxy.actualBurnCycle();
+    const totalSupplyBefore = await dgvcProxy.totalSupply();
+
+    // buy tokens on dex1
+    await uniswapRouter.connect(user).swapETHForExactTokens(
+      amount,
+      [weth.address, dgvcProxy.address],
+      user.address,
+      new Date().getTime() + 3000,
+      { value: utils.parseEther('2') }
+    );
+  
+    const balanceAfter = await dgvcProxy.balanceOf(user.address);
+    const balanceOfFeeReceiverAfter = await dgvcProxy.balanceOf(feeReceiver.address);
+    const actualBurnCycleAfter = await dgvcProxy.actualBurnCycle();
+    const totalSupplyAfter = await dgvcProxy.totalSupply();
+    
+    expect(await dgvcProxy.balanceOf(user.address)).to.equal(amount - (amount * (DEX_BUY_FEE + DEX_BURN_FEE) / HUNDRED_PERCENT));
+    expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal(amount * DEX_BUY_FEE / HUNDRED_PERCENT);
+    expect(await dgvcProxy.actualBurnCycle()).to.equal((actualBurnCycleBefore) + (BNtoBigInt(amount) * DEX_BURN_FEE / HUNDRED_PERCENT));    
+    expect(await dgvcProxy.totalSupply()).to.equal( BNtoBigInt(totalSupplyBefore) - (BNtoBigInt(amount) * (DEX_BURN_FEE ) / HUNDRED_PERCENT));
+
+    // buy tokens on dex2
+    const DEX2_BUY_FEE = 350n;
+    const DEX2_SELL_FEE = 400n;
+    const DEX2_BURN_FEE = 100n;
+
+    const amount2 = utils.parseUnits('2000', baseUnit).toBigInt();
+
+    await dgvcProxy.setDexFee(uniswapPair2.address, DEX2_BUY_FEE, DEX2_SELL_FEE, DEX2_BURN_FEE);
+
+    const { buy: buy2, sell: sell2, burn: burn2 } = await dgvcProxy.dexFOT(uniswapPair2.address);
+
+    expect(buy2).to.equal(BigInttoBN(DEX2_BUY_FEE));
+    expect(sell2).to.equal(BigInttoBN(DEX2_SELL_FEE));
+    expect(burn2).to.equal(BigInttoBN(DEX2_BURN_FEE));
+
+    await uniswapRouter2.connect(user).swapETHForExactTokens(
+      amount2,
+      [weth2.address, dgvcProxy.address],
+      user.address,
+      new Date().getTime() + 3000,
+      { value: utils.parseEther('4') }
+    );
+
+    expect(await dgvcProxy.balanceOf(user.address)).to.equal( BNtoBigInt(balanceAfter) + (BNtoBigInt(amount2) - BNtoBigInt(amount2 * (DEX2_BUY_FEE + DEX2_BURN_FEE) / HUNDRED_PERCENT)));
+    expect(await dgvcProxy.balanceOf(feeReceiver.address)).to.equal( BNtoBigInt(balanceOfFeeReceiverAfter) + (BNtoBigInt(amount2) * DEX2_BUY_FEE / HUNDRED_PERCENT));
+    expect(await dgvcProxy.actualBurnCycle()).to.equal(BNtoBigInt(actualBurnCycleAfter) + (BNtoBigInt(amount2) * DEX2_BURN_FEE / HUNDRED_PERCENT));    
+    expect(await dgvcProxy.totalSupply()).to.equal( BNtoBigInt(totalSupplyAfter) - (BNtoBigInt(amount2) * DEX2_BURN_FEE / HUNDRED_PERCENT));
   });
 });
