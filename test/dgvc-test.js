@@ -66,7 +66,7 @@ const { expect } = require('chai');
       assert.strictEqual(await dgvcProxy.owner(), newOwner.address);
     });
 
-    it("should be possible to change router address", async function () {
+    it('should be possible to change router address', async function () {
       const routerAddress = accounts[8];
       await dgvcProxy.setRouter(routerAddress.address);
       assert.strictEqual(await dgvcProxy.router(), routerAddress.address);

@@ -19,10 +19,6 @@ async function main() {
   await dgvcImplementation.deployed();
 
   await dgvcImplementation.init(router);
-  await dgvcImplementation.setBurnCycle(burnCycle);
-  await dgvcImplementation.setRebaseDelta(rebaseDelta);
-  await dgvcImplementation.setCommonFee(commonFee);
-  await dgvcImplementation.setBurnFee(burnFee);
   await dgvcImplementation.renounceOwnership();
 
   const DGVCProxy = await hre.ethers.getContractFactory("DGVCProxy");
@@ -41,6 +37,8 @@ async function main() {
 
   await dgvcProxy.setRebaseDelta(rebaseDelta);
   await dgvcProxy.setBurnCycle(burnCycle);
+  await dgvcProxy.setCommonFee(commonFee);
+  await dgvcProxy.setBurnFee(burnFee);
 
   console.log("dgvcProxy deployed to:", dgvcProxy.address);
   console.log("dgvcImplementation: ", dgvcImplementation.address);
