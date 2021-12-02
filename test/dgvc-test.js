@@ -66,6 +66,15 @@ const { expect } = require('chai');
       assert.strictEqual(await dgvcProxy.owner(), newOwner.address);
     });
 
+    it("should be possible to change router address", async function () {
+      const routerAddress = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
+      await dgvcProxy.setRouter(routerAddress);
+      assert.strictEqual(await dgvcProxy.router(), routerAddress);
+      const routerAddress1 = "0x09676Ee4685B618d0DCc85E221019c9Ce3810211";
+      await dgvcProxy.setRouter(routerAddress1);
+      assert.strictEqual(await dgvcProxy.router(), routerAddress1);
+    });
+
     it('should be  possible to get old owner', async function() {
       assert.strictEqual(await dgvcProxy.owner(), owner.address);
     });

@@ -21,6 +21,16 @@ module.exports = {
       url: `https://bsc-dataseed1.ninicoin.io`,
       accounts: [PRIVATE_KEY]
     },
+    polygon: {
+      url: "https://polygon-rpc.com",
+      accounts: [PRIVATE_KEY],
+    },
+    testnet: {
+      url: "https://eth-rinkeby.alchemyapi.io/v2/hkrPPa0ry9wvMtDfr7VWiAf5DD_9Rgde",
+      accounts: [PRIVATE_KEY],
+      gas: 2100000,
+      gasPrice: 8000000000,
+    },
   },
   solidity: {
     version: "0.8.4",
