@@ -67,12 +67,18 @@ const { expect } = require('chai');
     });
 
     it("should be possible to change router address", async function () {
-      const routerAddress = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
-      await dgvcProxy.setRouter(routerAddress);
-      assert.strictEqual(await dgvcProxy.router(), routerAddress);
-      const routerAddress1 = "0x09676Ee4685B618d0DCc85E221019c9Ce3810211";
-      await dgvcProxy.setRouter(routerAddress1);
-      assert.strictEqual(await dgvcProxy.router(), routerAddress1);
+      const routerAddress = accounts[8];
+      await dgvcProxy.setRouter(routerAddress.address);
+      assert.strictEqual(await dgvcProxy.router(), routerAddress.address);
+      const routerAddress1 = accounts[9];
+      await dgvcProxy.setRouter(routerAddress1.address);
+      assert.strictEqual(await dgvcProxy.router(), routerAddress1.address);
+    });
+
+    it('should not be able to set router address', async function() {
+      const owner = accounts[0];
+      await dgvcProxy.transferOwnership(owner.address);
+      await expect(dgvcProxy.connect(user).setRouter(router)).to.revertedWith('caller is not the owner');
     });
 
     it('should be  possible to get old owner', async function() {

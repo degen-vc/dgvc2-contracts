@@ -1,15 +1,16 @@
 const hre = require("hardhat"); //import the hardhat
 const { utils } = require("ethers");
+const {BURN_CYCLE, REBASE_DELTA, COMMON_FEE, BURN_FEE} = process.env;
 
 async function main() {
   const [deployer] = await ethers.getSigners(); //get the account to deploy the contract
 
   const baseUnit = 18;
   const router = "0x0000000000000000000000000000000000000000";
-  // const burnCycle = utils.parseUnits("5000", baseUnit).toBigInt();
-  // const rebaseDelta = utils.parseUnits("4000", baseUnit).toBigInt();
-  // const commonFee = 0;
-  // const burnFee = 0;
+  const burnCycle = utils.parseUnits(BURN_CYCLE, baseUnit).toBigInt();
+  const rebaseDelta = utils.parseUnits(REBASE_DELTA, baseUnit).toBigInt();
+  const commonFee = COMMON_FEE;
+  const burnFee = BURN_FEE;
 
   const DGVCImplementation = await ethers.getContractFactory(
     "DGVCImplementation"
@@ -17,13 +18,11 @@ async function main() {
   const dgvcImplementation = await DGVCImplementation.deploy();
   await dgvcImplementation.deployed();
 
-  const dgvc = await DGVC.deploy();
-
   await dgvcImplementation.init(router);
-  // await dgvcImplementation.setBurnCycle(burnCycle);
-  // await dgvcImplementation.setRebaseDelta(rebaseDelta);
-  // await dgvcImplementation.setCommonFee(commonFee);
-  // await dgvcImplementation.setBurnFee(burnFee);
+  await dgvcImplementation.setBurnCycle(burnCycle);
+  await dgvcImplementation.setRebaseDelta(rebaseDelta);
+  await dgvcImplementation.setCommonFee(commonFee);
+  await dgvcImplementation.setBurnFee(burnFee);
   await dgvcImplementation.renounceOwnership();
 
   const DGVCProxy = await hre.ethers.getContractFactory("DGVCProxy");
@@ -44,12 +43,7 @@ async function main() {
   await dgvcProxy.setBurnCycle(burnCycle);
 
   console.log("dgvcProxy deployed to:", dgvcProxy.address);
-  console.log(
-    "degenv1: ",
-    dgvc.address,
-    "dgvcImplementation: ",
-    dgvcImplementation.address
-  );
+  console.log("dgvcImplementation: ", dgvcImplementation.address);
 }
 
 main()
