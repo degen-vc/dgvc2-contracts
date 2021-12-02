@@ -25,7 +25,7 @@ module.exports = {
       url: "https://polygon-rpc.com",
       accounts: [PRIVATE_KEY],
     },
-    testnet: {
+    rinkeby: {
       url: "https://eth-rinkeby.alchemyapi.io/v2/hkrPPa0ry9wvMtDfr7VWiAf5DD_9Rgde",
       accounts: [PRIVATE_KEY],
       gas: 2100000,

@@ -11,9 +11,6 @@ async function main() {
   // const commonFee = 0;
   // const burnFee = 0;
 
-  console.log("Deploying contracts with the account:", deployer.address);
-
-  const DGVC = await ethers.getContractFactory("DegenVC1");
   const DGVCImplementation = await ethers.getContractFactory(
     "DGVCImplementation"
   );
@@ -50,7 +47,7 @@ async function main() {
   console.log(
     "degenv1: ",
     dgvc.address,
-    "degenv2: ",
+    "dgvcImplementation: ",
     dgvcImplementation.address
   );
 }
