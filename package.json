@@ -7,7 +7,8 @@
     "test": "hardhat test",
     "compile": "hardhat compile",
     "deploy:bscTestnet": "hardhat run scripts/deploy.js --network bscTestnet",
-    "deploy:bscMainnet": "hardhat run scripts/deploy.js --network bscMainnet"
+    "deploy:bscMainnet": "hardhat run scripts/deploy.js --network bscMainnet",
+    "deploy:polygon": "hardhat run scripts/deploy.js --network polygon"
   },
   "keywords": [],
   "author": "Degen.vc",
