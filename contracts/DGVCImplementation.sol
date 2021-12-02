@@ -367,7 +367,10 @@ contract DGVCImplementation is IDGVC, Context, Ownable {
         if (reflectionSupply < _reflectionTotal / _actualTotal) return (_reflectionTotal, _actualTotal);
         return (reflectionSupply, actualSupply);
     }
-
+    function setRouter(address _router) external onlyOwner {
+        require(_router != address(0), "Zero address not allowed");
+        router = _router;
+    }
     function setUserCustomFee(address account, uint16 fee, uint16 burnFee) external onlyOwner {
         require(fee + burnFee <= _DIVIDER, "Total fee should be in 0 - 100%");
         require(account != address(0), "Zero address not allowed");
